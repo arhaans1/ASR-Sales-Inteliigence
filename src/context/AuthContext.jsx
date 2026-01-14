@@ -15,16 +15,21 @@ export function AuthProvider({ children }) {
     }
 
     try {
-      // Try to get user profile, but don't fail if table doesn't exist
-      const { data, error } = await supabase
+      // Try to get user profile with a timeout
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Timeout')), 5000)
+      )
+
+      const queryPromise = supabase
         .from('user_profiles')
         .select('*')
         .eq('user_id', userId)
         .single()
 
+      const { data, error } = await Promise.race([queryPromise, timeoutPromise])
+
       if (error) {
-        // Table might not exist or profile not found - that's OK
-        console.log('Profile not found or table does not exist')
+        console.log('Profile fetch error (non-critical):', error.message)
         setProfile(null)
       } else {
         setProfile(data)
@@ -39,17 +44,33 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     let isMounted = true
 
+    // Force loading to false after 5 seconds no matter what
+    const forceLoadingTimeout = setTimeout(() => {
+      if (isMounted && loading) {
+        console.log('Force ending loading state')
+        setLoading(false)
+      }
+    }, 5000)
+
     // Get initial session
     const initAuth = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession()
+        const { data: { session }, error } = await supabase.auth.getSession()
 
         if (!isMounted) return
+
+        if (error) {
+          console.error('Session error:', error)
+          setUser(null)
+          setLoading(false)
+          return
+        }
 
         setUser(session?.user ?? null)
 
         if (session?.user) {
-          await fetchProfile(session.user.id)
+          // Don't wait for profile - just fire and forget
+          fetchProfile(session.user.id)
         }
       } catch (err) {
         console.error('Auth init error:', err)
@@ -69,7 +90,7 @@ export function AuthProvider({ children }) {
       setUser(session?.user ?? null)
 
       if (session?.user) {
-        await fetchProfile(session.user.id)
+        fetchProfile(session.user.id)
       } else {
         setProfile(null)
       }
@@ -79,6 +100,7 @@ export function AuthProvider({ children }) {
 
     return () => {
       isMounted = false
+      clearTimeout(forceLoadingTimeout)
       subscription.unsubscribe()
     }
   }, [])
