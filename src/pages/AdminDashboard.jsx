@@ -95,22 +95,22 @@ export default function AdminDashboard() {
   const activeProspects = prospects.filter(p => !['won', 'lost'].includes(p.status)).length
 
   return (
-    <div className="min-h-screen bg-gray-900">
+    <div className="min-h-screen bg-gray-50">
       {/* Admin Header */}
-      <header className="bg-gray-800 border-b border-gray-700">
+      <header className="bg-white shadow-sm border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center space-x-3">
-              <span className="text-xl font-bold text-red-500">Admin Panel</span>
-              <span className="text-sm text-gray-500">|</span>
-              <span className="text-sm text-gray-400">Prospect Tracker</span>
+              <span className="text-xl font-bold text-indigo-600">Admin Panel</span>
+              <span className="text-sm text-gray-400">|</span>
+              <span className="text-sm text-gray-500">Prospect Tracker</span>
             </div>
 
             <div className="flex items-center space-x-4">
-              <span className="text-sm text-gray-400">{user?.email}</span>
+              <span className="text-sm text-gray-600">{user?.email}</span>
               <button
                 onClick={handleSignOut}
-                className="text-sm text-gray-400 hover:text-white font-medium"
+                className="text-sm text-gray-500 hover:text-gray-700 font-medium"
               >
                 Logout
               </button>
@@ -123,39 +123,39 @@ export default function AdminDashboard() {
         <div className="space-y-6">
           {/* Stats Cards */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
-              <p className="text-sm text-gray-400">Total Users</p>
-              <p className="text-2xl font-bold text-white">{users.length}</p>
+            <div className="bg-white rounded-lg p-4 border border-gray-200 shadow-sm">
+              <p className="text-sm text-gray-500">Total Users</p>
+              <p className="text-2xl font-bold text-gray-900">{users.length}</p>
             </div>
-            <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
-              <p className="text-sm text-gray-400">Total Prospects</p>
-              <p className="text-2xl font-bold text-white">{totalProspects}</p>
+            <div className="bg-white rounded-lg p-4 border border-gray-200 shadow-sm">
+              <p className="text-sm text-gray-500">Total Prospects</p>
+              <p className="text-2xl font-bold text-gray-900">{totalProspects}</p>
             </div>
-            <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
-              <p className="text-sm text-gray-400">Active Prospects</p>
-              <p className="text-2xl font-bold text-yellow-500">{activeProspects}</p>
+            <div className="bg-white rounded-lg p-4 border border-gray-200 shadow-sm">
+              <p className="text-sm text-gray-500">Active Prospects</p>
+              <p className="text-2xl font-bold text-yellow-600">{activeProspects}</p>
             </div>
-            <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
-              <p className="text-sm text-gray-400">Won Deals</p>
-              <p className="text-2xl font-bold text-green-500">{wonProspects}</p>
+            <div className="bg-white rounded-lg p-4 border border-gray-200 shadow-sm">
+              <p className="text-sm text-gray-500">Won Deals</p>
+              <p className="text-2xl font-bold text-green-600">{wonProspects}</p>
             </div>
           </div>
 
           {/* User Selector */}
-          <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
+          <div className="bg-white rounded-lg p-4 border border-gray-200 shadow-sm">
             <div className="flex items-center justify-between">
               <div>
-                <h3 className="text-lg font-medium text-white">Viewing Data For:</h3>
-                <p className="text-sm text-gray-400 mt-1">
+                <h3 className="text-lg font-medium text-gray-900">Viewing Data For:</h3>
+                <p className="text-sm text-gray-500 mt-1">
                   {selectedUser ? (
                     <>
-                      <span className="text-indigo-400 font-medium">{selectedUser.email}</span>
-                      <span className="text-gray-500 ml-2">
+                      <span className="text-indigo-600 font-medium">{selectedUser.email}</span>
+                      <span className="text-gray-400 ml-2">
                         (Joined {formatDate(selectedUser.created_at)})
                       </span>
                     </>
                   ) : (
-                    <span className="text-green-400 font-medium">All Users</span>
+                    <span className="text-green-600 font-medium">All Users</span>
                   )}
                 </p>
               </div>
@@ -169,14 +169,14 @@ export default function AdminDashboard() {
           </div>
 
           {/* Search and Filter */}
-          <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
+          <div className="bg-white rounded-lg p-4 border border-gray-200 shadow-sm">
             <SearchBar onSearch={handleSearch} />
           </div>
 
           {/* Prospects Table */}
-          <div className="bg-gray-800 rounded-lg border border-gray-700 overflow-hidden">
-            <div className="px-4 py-3 border-b border-gray-700 flex items-center justify-between">
-              <h3 className="text-lg font-medium text-white">
+          <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
+            <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
+              <h3 className="text-lg font-medium text-gray-900">
                 Prospects {selectedUser && `- ${selectedUser.email}`}
               </h3>
               {selectedUser && (
@@ -188,26 +188,24 @@ export default function AdminDashboard() {
                 </Link>
               )}
             </div>
-            <div className="[&_table]:text-gray-300 [&_th]:text-gray-400 [&_td]:text-gray-300 [&_tr:hover]:bg-gray-700/50">
-              <ProspectList
-                prospects={prospects}
-                loading={loading}
-                onDelete={handleDelete}
-              />
-            </div>
+            <ProspectList
+              prospects={prospects}
+              loading={loading}
+              onDelete={handleDelete}
+            />
           </div>
         </div>
       </main>
 
       {/* User Selection Modal */}
       {showUserModal && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
-          <div className="bg-gray-800 rounded-lg w-full max-w-lg mx-4 border border-gray-700">
-            <div className="px-6 py-4 border-b border-gray-700 flex items-center justify-between">
-              <h3 className="text-lg font-medium text-white">Select User</h3>
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg w-full max-w-lg mx-4 shadow-xl">
+            <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+              <h3 className="text-lg font-medium text-gray-900">Select User</h3>
               <button
                 onClick={() => setShowUserModal(false)}
-                className="text-gray-400 hover:text-white"
+                className="text-gray-400 hover:text-gray-600"
               >
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -221,8 +219,8 @@ export default function AdminDashboard() {
                 onClick={() => handleUserSelect(null)}
                 className={`w-full text-left px-4 py-3 rounded-lg mb-2 transition-colors ${
                   !selectedUser
-                    ? 'bg-green-600/20 border border-green-500 text-green-400'
-                    : 'bg-gray-700/50 hover:bg-gray-700 text-gray-300'
+                    ? 'bg-green-50 border border-green-300 text-green-700'
+                    : 'bg-gray-50 hover:bg-gray-100 text-gray-700'
                 }`}
               >
                 <div className="font-medium">All Users</div>
@@ -236,8 +234,8 @@ export default function AdminDashboard() {
                   onClick={() => handleUserSelect(userProfile)}
                   className={`w-full text-left px-4 py-3 rounded-lg mb-2 transition-colors ${
                     selectedUser?.user_id === userProfile.user_id
-                      ? 'bg-indigo-600/20 border border-indigo-500 text-indigo-400'
-                      : 'bg-gray-700/50 hover:bg-gray-700 text-gray-300'
+                      ? 'bg-indigo-50 border border-indigo-300 text-indigo-700'
+                      : 'bg-gray-50 hover:bg-gray-100 text-gray-700'
                   }`}
                 >
                   <div className="font-medium">{userProfile.email}</div>
