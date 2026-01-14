@@ -70,3 +70,48 @@ export const deleteNote = (id) =>
 
 export const togglePinNote = (id, isPinned) =>
   supabase.from('prospect_notes').update({ is_pinned: !isPinned }).eq('id', id).select().single()
+
+// User Profiles
+export const getUserProfile = (userId) =>
+  supabase.from('user_profiles').select('*').eq('user_id', userId).single()
+
+export const getAllUsers = () =>
+  supabase.from('user_profiles').select('*').order('created_at', { ascending: false })
+
+// Superadmin - Get prospects for specific user
+export const getProspectsByUser = (userId) =>
+  supabase.from('prospects').select('*').eq('user_id', userId).order('created_at', { ascending: false })
+
+// Superadmin - Search prospects for specific user
+export const searchProspectsByUser = (userId, query, status) => {
+  let queryBuilder = supabase.from('prospects').select('*').eq('user_id', userId)
+
+  if (query) {
+    queryBuilder = queryBuilder.or(`name.ilike.%${query}%,business_name.ilike.%${query}%`)
+  }
+
+  if (status && status !== 'all') {
+    queryBuilder = queryBuilder.eq('status', status)
+  }
+
+  return queryBuilder.order('created_at', { ascending: false })
+}
+
+// Superadmin - Get all prospects (across all users)
+export const getAllProspects = () =>
+  supabase.from('prospects').select('*').order('created_at', { ascending: false })
+
+// Superadmin - Search all prospects
+export const searchAllProspects = (query, status) => {
+  let queryBuilder = supabase.from('prospects').select('*')
+
+  if (query) {
+    queryBuilder = queryBuilder.or(`name.ilike.%${query}%,business_name.ilike.%${query}%`)
+  }
+
+  if (status && status !== 'all') {
+    queryBuilder = queryBuilder.eq('status', status)
+  }
+
+  return queryBuilder.order('created_at', { ascending: false })
+}
