@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState } from 'react'
-import { supabase, onAuthStateChange, signIn as supabaseSignIn, signUp as supabaseSignUp, signOut as supabaseSignOut, getUserProfile } from '../lib/supabase'
+import { supabase, onAuthStateChange, signIn as supabaseSignIn, signUp as supabaseSignUp, signOut as supabaseSignOut } from '../lib/supabase'
 
 const AuthContext = createContext({})
 
@@ -15,42 +15,72 @@ export function AuthProvider({ children }) {
     }
 
     try {
-      const { data, error } = await getUserProfile(userId)
+      // Try to get user profile, but don't fail if table doesn't exist
+      const { data, error } = await supabase
+        .from('user_profiles')
+        .select('*')
+        .eq('user_id', userId)
+        .single()
+
       if (error) {
-        // Profile might not exist yet for new users
-        console.log('Profile not found, may be new user')
+        // Table might not exist or profile not found - that's OK
+        console.log('Profile not found or table does not exist')
         setProfile(null)
       } else {
         setProfile(data)
       }
     } catch (err) {
-      console.error('Error fetching profile:', err)
+      // Silently fail - superadmin features just won't work
+      console.log('Could not fetch profile:', err.message)
       setProfile(null)
     }
   }
 
   useEffect(() => {
+    let isMounted = true
+
     // Get initial session
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      setUser(session?.user ?? null)
-      if (session?.user) {
-        await fetchProfile(session.user.id)
+    const initAuth = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+
+        if (!isMounted) return
+
+        setUser(session?.user ?? null)
+
+        if (session?.user) {
+          await fetchProfile(session.user.id)
+        }
+      } catch (err) {
+        console.error('Auth init error:', err)
+      } finally {
+        if (isMounted) {
+          setLoading(false)
+        }
       }
-      setLoading(false)
-    })
+    }
+
+    initAuth()
 
     // Listen for auth changes
     const { data: { subscription } } = onAuthStateChange(async (_event, session) => {
+      if (!isMounted) return
+
       setUser(session?.user ?? null)
+
       if (session?.user) {
         await fetchProfile(session.user.id)
       } else {
         setProfile(null)
       }
+
       setLoading(false)
     })
 
-    return () => subscription.unsubscribe()
+    return () => {
+      isMounted = false
+      subscription.unsubscribe()
+    }
   }, [])
 
   const signIn = async (email, password) => {
