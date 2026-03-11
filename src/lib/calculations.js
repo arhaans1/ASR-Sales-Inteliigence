@@ -1,263 +1,100 @@
-// Calculate current funnel metrics from entered data
-export function calculateCurrentMetrics(prospect) {
+/**
+ * Business Profitability Simulator — Calculation Engine
+ *
+ * Takes user inputs and returns all derived financial metrics.
+ * All monetary values are in INR.
+ */
+
+export function calculate(inputs) {
   const {
-    current_daily_spend,
-    current_cpa_stage1,
-    stage1_price = 0,
-    stage2_price = 0,
-    stage3_price = 0,
-    current_stage2_rate = 0,
-    current_stage3_rate = 0,
-    current_stage4_rate = 0,
-    current_conversion_rate = 0,
-    high_ticket_price = 0,
-    stage3_enabled = false,
-    stage4_enabled = false
-  } = prospect
+    fixedMonthlyExpense = 0,
+    costPerQualifiedCall = 0,
+    callsToClose = 1,
+    avgSaleValue = 0,
+    teamCommissionPct = 0,
+    gstOnAdSpendPct = 18,
+    desiredMonthlyProfit = 0,
+    numClosers = 1,
+    maxCallsPerCloserPerDay = 8,
+    simulateAdCostIncrease = false,
+  } = inputs
 
-  // Early return if required fields are missing
-  if (!current_daily_spend || !current_cpa_stage1) {
-    return null
+  const safeCallsToClose = Math.max(Number(callsToClose) || 1, 1)
+  const safeNumClosers   = Math.max(Number(numClosers) || 1, 1)
+  const safeMaxCalls     = Math.max(Number(maxCallsPerCloserPerDay) || 1, 1)
+
+  // ── Monthly Capacity (total calls team can handle) ──────────
+  const monthlyCapacity = safeNumClosers * safeMaxCalls * 30
+
+  // ── Simulation Mode: +5% cost per call per 50 calls ─────────
+  let effectiveCostPerCall = Number(costPerQualifiedCall) || 0
+  if (simulateAdCostIncrease && monthlyCapacity > 0) {
+    const batches = Math.floor(monthlyCapacity / 50)
+    effectiveCostPerCall = effectiveCostPerCall * (1 + batches * 0.05)
   }
 
-  const monthly_spend = current_daily_spend * 30
-  const stage1_volume = monthly_spend / current_cpa_stage1
+  // ── CAC = (Calls to Close × Cost Per Call) × (1 + GST%) ─────
+  const gstMultiplier = 1 + (Number(gstOnAdSpendPct) || 0) / 100
+  const cac = safeCallsToClose * effectiveCostPerCall * gstMultiplier
 
-  // Build conversion chain
-  let volumes = [stage1_volume]
-  let cpas = [current_cpa_stage1]
-  let stageNames = [prospect.stage1_name || 'Registration']
+  // ── Commission per Sale ──────────────────────────────────────
+  const commissionPerSale =
+    (Number(avgSaleValue) || 0) * ((Number(teamCommissionPct) || 0) / 100)
 
-  // Stage 2
-  if (current_stage2_rate > 0) {
-    const s2_vol = stage1_volume * (current_stage2_rate / 100)
-    const s2_cpa = current_cpa_stage1 / (current_stage2_rate / 100)
-    volumes.push(s2_vol)
-    cpas.push(s2_cpa)
-    stageNames.push(prospect.stage2_name || 'Attendance')
-  }
+  // ── Contribution Margin per Sale = Revenue − Commission − CAC
+  const marginPerSale = (Number(avgSaleValue) || 0) - commissionPerSale - cac
 
-  // Stage 3
-  if (stage3_enabled && current_stage3_rate > 0 && volumes.length > 1) {
-    const prevVol = volumes[volumes.length - 1]
-    const prevCpa = cpas[cpas.length - 1]
-    const s3_vol = prevVol * (current_stage3_rate / 100)
-    const s3_cpa = prevCpa / (current_stage3_rate / 100)
-    volumes.push(s3_vol)
-    cpas.push(s3_cpa)
-    stageNames.push(prospect.stage3_name || 'Call Booking')
-  }
+  // ── Required Sales = (Fixed Expense + Desired Profit) / Margin
+  const fixedExp = Number(fixedMonthlyExpense) || 0
+  const desiredProfit = Number(desiredMonthlyProfit) || 0
+  const requiredSales =
+    marginPerSale > 0 ? (fixedExp + desiredProfit) / marginPerSale : Infinity
 
-  // Stage 4
-  if (stage4_enabled && current_stage4_rate > 0 && volumes.length > 2) {
-    const prevVol = volumes[volumes.length - 1]
-    const prevCpa = cpas[cpas.length - 1]
-    const s4_vol = prevVol * (current_stage4_rate / 100)
-    const s4_cpa = prevCpa / (current_stage4_rate / 100)
-    volumes.push(s4_vol)
-    cpas.push(s4_cpa)
-    stageNames.push(prospect.stage4_name || 'Call Attendance')
-  }
+  // ── Actual Sales at Full Capacity ────────────────────────────
+  const actualSalesAtCapacity = monthlyCapacity / safeCallsToClose
 
-  // Final conversion
-  const lastVol = volumes[volumes.length - 1]
-  const lastCpa = cpas[cpas.length - 1]
-  const sales = current_conversion_rate > 0 ? lastVol * (current_conversion_rate / 100) : 0
-  const cpa_customer = current_conversion_rate > 0 ? lastCpa / (current_conversion_rate / 100) : 0
+  // ── Current Profit at Full Capacity ─────────────────────────
+  const profitAtCapacity = actualSalesAtCapacity * marginPerSale - fixedExp
 
-  // Revenue calculation
-  let revenue = sales * (high_ticket_price || 0)
-  if (stage1_price > 0) revenue += stage1_volume * stage1_price
-  if (stage2_price > 0 && volumes.length > 1) revenue += volumes[1] * stage2_price
-  if (stage3_enabled && stage3_price > 0 && volumes.length > 2) revenue += volumes[2] * stage3_price
+  // ── Revenue Metrics ──────────────────────────────────────────
+  const totalRevenueNeeded = isFinite(requiredSales)
+    ? requiredSales * (Number(avgSaleValue) || 0)
+    : 0
+  const revenueAtCapacity =
+    actualSalesAtCapacity * (Number(avgSaleValue) || 0)
 
-  const roi = monthly_spend > 0 ? revenue / monthly_spend : 0
-  const profit = revenue - monthly_spend
+  // ── Ad Spend Metrics ─────────────────────────────────────────
+  const monthlyAdSpend = monthlyCapacity * effectiveCostPerCall * gstMultiplier
+  const dailyAdSpend   = monthlyAdSpend / 30
 
-  // Calculate rates
-  const rates = [null] // Stage 1 has no rate
-  if (current_stage2_rate > 0) rates.push(current_stage2_rate)
-  if (stage3_enabled && current_stage3_rate > 0) rates.push(current_stage3_rate)
-  if (stage4_enabled && current_stage4_rate > 0) rates.push(current_stage4_rate)
-
-  // Stage prices
-  const prices = [stage1_price]
-  if (volumes.length > 1) prices.push(stage2_price)
-  if (stage3_enabled && volumes.length > 2) prices.push(stage3_price)
-  if (stage4_enabled && volumes.length > 3) prices.push(0)
-
-  // Overall conversion rate (stage 1 to customer)
-  const overall_conversion_rate = stage1_volume > 0 ? (sales / stage1_volume) * 100 : 0
+  // ── Status Flags ─────────────────────────────────────────────
+  const hasNegativeMargin = marginPerSale <= 0
+  const isFeasible =
+    isFinite(requiredSales) &&
+    actualSalesAtCapacity >= requiredSales &&
+    !hasNegativeMargin
+  const isProfit = profitAtCapacity > 0
 
   return {
-    monthly_spend,
-    volumes: volumes.map(v => Math.round(v * 10) / 10),
-    cpas: cpas.map(c => Math.round(c)),
-    rates,
-    prices,
-    stageNames,
-    sales: Math.round(sales * 10) / 10,
-    cpa_customer: Math.round(cpa_customer),
-    revenue: Math.round(revenue),
-    profit: Math.round(profit),
-    roi: Math.round(roi * 100) / 100,
-    overall_conversion_rate: Math.round(overall_conversion_rate * 100) / 100,
-    is_profitable: profit > 0,
-    roi_status: roi >= 2 ? 'healthy' : roi >= 1 ? 'break_even' : 'losing'
-  }
-}
+    cac,
+    commissionPerSale,
+    marginPerSale,
+    effectiveCostPerCall,
 
-// Calculate projections with new inputs
-export function calculateProjections(prospect, projectedInputs = {}) {
-  const merged = { ...prospect, ...projectedInputs }
+    monthlyCapacity,
+    actualSalesAtCapacity,
 
-  const {
-    projected_daily_spend,
-    projected_cpa_stage1,
-    stage1_price = 0,
-    stage2_price = 0,
-    stage3_price = 0,
-    projected_stage2_rate,
-    projected_stage3_rate,
-    projected_stage4_rate,
-    projected_conversion_rate,
-    projected_high_ticket_price,
-    stage3_enabled = false,
-    stage4_enabled = false
-  } = merged
+    requiredSales,
+    totalRevenueNeeded,
+    revenueAtCapacity,
 
-  // Use projected values or fall back to current values
-  const dailySpend = projected_daily_spend || prospect.current_daily_spend
-  const cpaStage1 = projected_cpa_stage1 || prospect.current_cpa_stage1
-  const stage2Rate = projected_stage2_rate ?? prospect.current_stage2_rate
-  const stage3Rate = projected_stage3_rate ?? prospect.current_stage3_rate
-  const stage4Rate = projected_stage4_rate ?? prospect.current_stage4_rate
-  const conversionRate = projected_conversion_rate ?? prospect.current_conversion_rate
-  const ticketPrice = projected_high_ticket_price || prospect.high_ticket_price
+    profitAtCapacity,
+    monthlyAdSpend,
+    dailyAdSpend,
 
-  if (!dailySpend || !cpaStage1) {
-    return null
-  }
-
-  const monthly_spend = dailySpend * 30
-  const stage1_volume = monthly_spend / cpaStage1
-
-  // Build conversion chain
-  let volumes = [stage1_volume]
-  let cpas = [cpaStage1]
-
-  // Stage 2
-  if (stage2Rate > 0) {
-    const s2_vol = stage1_volume * (stage2Rate / 100)
-    const s2_cpa = cpaStage1 / (stage2Rate / 100)
-    volumes.push(s2_vol)
-    cpas.push(s2_cpa)
-  }
-
-  // Stage 3
-  if (stage3_enabled && stage3Rate > 0 && volumes.length > 1) {
-    const prevVol = volumes[volumes.length - 1]
-    const prevCpa = cpas[cpas.length - 1]
-    const s3_vol = prevVol * (stage3Rate / 100)
-    const s3_cpa = prevCpa / (stage3Rate / 100)
-    volumes.push(s3_vol)
-    cpas.push(s3_cpa)
-  }
-
-  // Stage 4
-  if (stage4_enabled && stage4Rate > 0 && volumes.length > 2) {
-    const prevVol = volumes[volumes.length - 1]
-    const prevCpa = cpas[cpas.length - 1]
-    const s4_vol = prevVol * (stage4Rate / 100)
-    const s4_cpa = prevCpa / (stage4Rate / 100)
-    volumes.push(s4_vol)
-    cpas.push(s4_cpa)
-  }
-
-  // Final conversion
-  const lastVol = volumes[volumes.length - 1]
-  const lastCpa = cpas[cpas.length - 1]
-  const sales = conversionRate > 0 ? lastVol * (conversionRate / 100) : 0
-  const cpa_customer = conversionRate > 0 ? lastCpa / (conversionRate / 100) : 0
-
-  // Revenue calculation
-  let revenue = sales * (ticketPrice || 0)
-  if (stage1_price > 0) revenue += stage1_volume * stage1_price
-  if (stage2_price > 0 && volumes.length > 1) revenue += volumes[1] * stage2_price
-  if (stage3_enabled && stage3_price > 0 && volumes.length > 2) revenue += volumes[2] * stage3_price
-
-  const roi = monthly_spend > 0 ? revenue / monthly_spend : 0
-  const profit = revenue - monthly_spend
-
-  // Calculate improvement from current metrics
-  const currentMetrics = calculateCurrentMetrics(prospect)
-
-  let salesIncrease = 0
-  let revenueIncrease = 0
-  let roiChange = 0
-
-  if (currentMetrics) {
-    salesIncrease = currentMetrics.sales > 0
-      ? Math.round(((sales / currentMetrics.sales) - 1) * 100)
-      : 0
-    revenueIncrease = currentMetrics.revenue > 0
-      ? Math.round(((revenue / currentMetrics.revenue) - 1) * 100)
-      : 0
-    roiChange = Math.round((roi - currentMetrics.roi) * 100) / 100
-  }
-
-  return {
-    monthly_spend,
-    daily_spend: dailySpend,
-    volumes: volumes.map(v => Math.round(v * 10) / 10),
-    cpas: cpas.map(c => Math.round(c)),
-    sales: Math.round(sales * 10) / 10,
-    cpa_customer: Math.round(cpa_customer),
-    revenue: Math.round(revenue),
-    profit: Math.round(profit),
-    roi: Math.round(roi * 100) / 100,
-    is_profitable: profit > 0,
-
-    // Improvements
-    sales_increase: salesIncrease,
-    revenue_increase: revenueIncrease,
-    roi_change: roiChange
-  }
-}
-
-// Scaling timeline calculation
-export function calculateScalingTimeline(currentSpend, targetSpend, incrementPercent = 20, frequencyDays = 3) {
-  if (!currentSpend || !targetSpend || currentSpend >= targetSpend) {
-    return { steps: [], totalSteps: 0, totalDays: 0, totalWeeks: 0 }
-  }
-
-  const steps = []
-  let current = currentSpend
-  let step = 0
-  let day = 0
-
-  while (current < targetSpend) {
-    steps.push({
-      step,
-      budget: Math.round(current),
-      day
-    })
-    current *= (1 + incrementPercent / 100)
-    step++
-    day += frequencyDays
-  }
-
-  steps.push({
-    step,
-    budget: Math.round(current),
-    day,
-    isTarget: true
-  })
-
-  return {
-    steps,
-    totalSteps: step,
-    totalDays: day,
-    totalWeeks: Math.ceil(day / 7)
+    isFeasible,
+    isProfit,
+    hasNegativeMargin,
+    capacityGap: requiredSales - actualSalesAtCapacity,
   }
 }

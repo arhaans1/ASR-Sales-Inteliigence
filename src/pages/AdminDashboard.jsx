@@ -1,81 +1,49 @@
-import { useState, useEffect, useCallback } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { Users, BarChart2, LogOut, ChevronDown, ChevronRight, ExternalLink, TrendingUp } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
-import { getAllUsers, getProspectsByUser, searchProspectsByUser, getAllProspects, searchAllProspects, deleteProspect as deleteProspectApi } from '../lib/supabase'
-import ProspectList from '../components/ProspectList'
-import SearchBar from '../components/SearchBar'
+import { getAllUsers, getClientsByAdmin } from '../lib/supabase'
 import { formatDate } from '../lib/formatters'
 
 export default function AdminDashboard() {
-  const { user, signOut, isSuperadmin } = useAuth()
+  const { user, signOut } = useAuth()
   const navigate = useNavigate()
 
   const [users, setUsers] = useState([])
-  const [selectedUser, setSelectedUser] = useState(null) // null means "all users"
-  const [prospects, setProspects] = useState([])
   const [loading, setLoading] = useState(true)
-  const [showUserModal, setShowUserModal] = useState(false)
+  const [selectedUser, setSelectedUser] = useState(null)
+  const [userClients, setUserClients] = useState([])
+  const [clientsLoading, setClientsLoading] = useState(false)
 
-  // Fetch all users on mount
   useEffect(() => {
     const fetchUsers = async () => {
-      const { data, error } = await getAllUsers()
-      if (!error && data) {
-        setUsers(data.filter(u => !u.is_superadmin)) // Exclude superadmin from list
+      try {
+        const data = await getAllUsers()
+        setUsers(data)
+      } catch (err) {
+        console.error(err)
+      } finally {
+        setLoading(false)
       }
     }
     fetchUsers()
   }, [])
 
-  // Fetch prospects based on selected user
-  const loadProspects = useCallback(async () => {
-    setLoading(true)
-    try {
-      let result
-      if (selectedUser) {
-        result = await getProspectsByUser(selectedUser.user_id)
-      } else {
-        result = await getAllProspects()
-      }
-
-      if (!result.error) {
-        setProspects(result.data || [])
-      }
-    } catch (err) {
-      console.error('Error loading prospects:', err)
-    } finally {
-      setLoading(false)
+  const toggleUser = async (u) => {
+    if (selectedUser?.user_id === u.user_id) {
+      setSelectedUser(null)
+      setUserClients([])
+      return
     }
-  }, [selectedUser])
-
-  useEffect(() => {
-    loadProspects()
-  }, [loadProspects])
-
-  const handleSearch = useCallback(async (query, status) => {
-    setLoading(true)
+    setSelectedUser(u)
+    setClientsLoading(true)
     try {
-      let result
-      if (selectedUser) {
-        result = await searchProspectsByUser(selectedUser.user_id, query, status)
-      } else {
-        result = await searchAllProspects(query, status)
-      }
-
-      if (!result.error) {
-        setProspects(result.data || [])
-      }
+      const clients = await getClientsByAdmin(u.user_id)
+      setUserClients(clients)
     } catch (err) {
-      console.error('Error searching prospects:', err)
+      console.error(err)
     } finally {
-      setLoading(false)
-    }
-  }, [selectedUser])
-
-  const handleDelete = async (id) => {
-    const { error } = await deleteProspectApi(id)
-    if (!error) {
-      setProspects(prev => prev.filter(p => p.id !== id))
+      setClientsLoading(false)
     }
   }
 
@@ -84,176 +52,148 @@ export default function AdminDashboard() {
     navigate('/admin/login')
   }
 
-  const handleUserSelect = (userProfile) => {
-    setSelectedUser(userProfile)
-    setShowUserModal(false)
-  }
-
-  // Get stats
-  const totalProspects = prospects.length
-  const wonProspects = prospects.filter(p => p.status === 'won').length
-  const activeProspects = prospects.filter(p => !['won', 'lost'].includes(p.status)).length
+  const adminUsers = users.filter((u) => !u.is_superadmin)
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Admin Header */}
-      <header className="bg-white shadow-sm border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center space-x-3">
-              <span className="text-xl font-bold text-indigo-600">Admin Panel</span>
-              <span className="text-sm text-gray-400">|</span>
-              <span className="text-sm text-gray-500">Prospect Tracker</span>
+      {/* Header */}
+      <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
+        <div className="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center">
+              <TrendingUp size={15} className="text-white" />
             </div>
-
-            <div className="flex items-center space-x-4">
-              <span className="text-sm text-gray-600">{user?.email}</span>
-              <button
-                onClick={handleSignOut}
-                className="text-sm text-gray-500 hover:text-gray-700 font-medium"
-              >
-                Logout
-              </button>
+            <div>
+              <p className="text-sm font-bold text-gray-900">Super Admin</p>
+              <p className="text-xs text-gray-400">Profit Simulator Platform</p>
             </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <span className="text-xs text-gray-400">{user?.email}</span>
+            <button
+              onClick={handleSignOut}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+            >
+              <LogOut size={13} />
+              Sign Out
+            </button>
           </div>
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="space-y-6">
-          {/* Stats Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="bg-white rounded-lg p-4 border border-gray-200 shadow-sm">
-              <p className="text-sm text-gray-500">Total Users</p>
-              <p className="text-2xl font-bold text-gray-900">{users.length}</p>
+      <div className="max-w-5xl mx-auto px-6 py-8">
+        {/* Stats */}
+        <div className="grid grid-cols-2 gap-4 mb-8">
+          <div className="bg-white rounded-2xl border border-gray-200 p-5 flex items-center gap-4">
+            <div className="w-11 h-11 bg-indigo-50 rounded-xl flex items-center justify-center flex-shrink-0">
+              <Users size={20} className="text-indigo-500" />
             </div>
-            <div className="bg-white rounded-lg p-4 border border-gray-200 shadow-sm">
-              <p className="text-sm text-gray-500">Total Prospects</p>
-              <p className="text-2xl font-bold text-gray-900">{totalProspects}</p>
-            </div>
-            <div className="bg-white rounded-lg p-4 border border-gray-200 shadow-sm">
-              <p className="text-sm text-gray-500">Active Prospects</p>
-              <p className="text-2xl font-bold text-yellow-600">{activeProspects}</p>
-            </div>
-            <div className="bg-white rounded-lg p-4 border border-gray-200 shadow-sm">
-              <p className="text-sm text-gray-500">Won Deals</p>
-              <p className="text-2xl font-bold text-green-600">{wonProspects}</p>
+            <div>
+              <p className="text-2xl font-bold text-gray-900">{adminUsers.length}</p>
+              <p className="text-sm text-gray-400">Admin Users</p>
             </div>
           </div>
-
-          {/* User Selector */}
-          <div className="bg-white rounded-lg p-4 border border-gray-200 shadow-sm">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-lg font-medium text-gray-900">Viewing Data For:</h3>
-                <p className="text-sm text-gray-500 mt-1">
-                  {selectedUser ? (
-                    <>
-                      <span className="text-indigo-600 font-medium">{selectedUser.email}</span>
-                      <span className="text-gray-400 ml-2">
-                        (Joined {formatDate(selectedUser.created_at)})
-                      </span>
-                    </>
-                  ) : (
-                    <span className="text-green-600 font-medium">All Users</span>
-                  )}
-                </p>
-              </div>
-              <button
-                onClick={() => setShowUserModal(true)}
-                className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-medium"
-              >
-                Select User
-              </button>
+          <div className="bg-white rounded-2xl border border-gray-200 p-5 flex items-center gap-4">
+            <div className="w-11 h-11 bg-purple-50 rounded-xl flex items-center justify-center flex-shrink-0">
+              <BarChart2 size={20} className="text-purple-500" />
             </div>
-          </div>
-
-          {/* Search and Filter */}
-          <div className="bg-white rounded-lg p-4 border border-gray-200 shadow-sm">
-            <SearchBar onSearch={handleSearch} />
-          </div>
-
-          {/* Prospects Table */}
-          <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
-            <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
-              <h3 className="text-lg font-medium text-gray-900">
-                Prospects {selectedUser && `- ${selectedUser.email}`}
-              </h3>
-              {selectedUser && (
-                <Link
-                  to={`/prospect/new?user_id=${selectedUser.user_id}`}
-                  className="px-3 py-1.5 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700"
-                >
-                  + Add Prospect for User
-                </Link>
-              )}
+            <div>
+              <p className="text-2xl font-bold text-gray-900">—</p>
+              <p className="text-sm text-gray-400">Total Clients</p>
             </div>
-            <ProspectList
-              prospects={prospects}
-              loading={loading}
-              onDelete={handleDelete}
-            />
           </div>
         </div>
-      </main>
 
-      {/* User Selection Modal */}
-      {showUserModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg w-full max-w-lg mx-4 shadow-xl">
-            <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
-              <h3 className="text-lg font-medium text-gray-900">Select User</h3>
-              <button
-                onClick={() => setShowUserModal(false)}
-                className="text-gray-400 hover:text-gray-600"
-              >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
+        {/* Users list */}
+        <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+          <div className="px-6 py-4 border-b border-gray-100">
+            <h2 className="text-base font-semibold text-gray-900">Admin Users</h2>
+            <p className="text-xs text-gray-400 mt-0.5">Click a user to view their clients</p>
+          </div>
+
+          {loading ? (
+            <div className="flex justify-center py-12">
+              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-indigo-500" />
             </div>
+          ) : users.length === 0 ? (
+            <div className="text-center py-12 text-gray-400 text-sm">No users found</div>
+          ) : (
+            <div className="divide-y divide-gray-50">
+              {users.map((u) => {
+                const isExpanded = selectedUser?.user_id === u.user_id
+                const initial = (u.email?.[0] ?? '?').toUpperCase()
+                return (
+                  <div key={u.user_id || u.id}>
+                    {/* User row */}
+                    <div
+                      className="flex items-center gap-4 px-6 py-4 hover:bg-gray-50 cursor-pointer transition-colors"
+                      onClick={() => toggleUser(u)}
+                    >
+                      <div className="w-9 h-9 bg-gray-100 rounded-full flex items-center justify-center flex-shrink-0">
+                        <span className="text-sm font-semibold text-gray-500">{initial}</span>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-gray-900">{u.email}</p>
+                        <p className="text-xs text-gray-400">
+                          {u.is_superadmin ? 'Super Admin · ' : 'Admin · '}
+                          Joined {formatDate(u.created_at)}
+                        </p>
+                      </div>
+                      {isExpanded ? (
+                        <ChevronDown size={16} className="text-gray-400 flex-shrink-0" />
+                      ) : (
+                        <ChevronRight size={16} className="text-gray-300 flex-shrink-0" />
+                      )}
+                    </div>
 
-            <div className="p-4 max-h-96 overflow-y-auto">
-              {/* All Users Option */}
-              <button
-                onClick={() => handleUserSelect(null)}
-                className={`w-full text-left px-4 py-3 rounded-lg mb-2 transition-colors ${
-                  !selectedUser
-                    ? 'bg-green-50 border border-green-300 text-green-700'
-                    : 'bg-gray-50 hover:bg-gray-100 text-gray-700'
-                }`}
-              >
-                <div className="font-medium">All Users</div>
-                <div className="text-sm text-gray-500">View prospects from all users</div>
-              </button>
-
-              {/* Individual Users */}
-              {users.map((userProfile) => (
-                <button
-                  key={userProfile.id}
-                  onClick={() => handleUserSelect(userProfile)}
-                  className={`w-full text-left px-4 py-3 rounded-lg mb-2 transition-colors ${
-                    selectedUser?.user_id === userProfile.user_id
-                      ? 'bg-indigo-50 border border-indigo-300 text-indigo-700'
-                      : 'bg-gray-50 hover:bg-gray-100 text-gray-700'
-                  }`}
-                >
-                  <div className="font-medium">{userProfile.email}</div>
-                  <div className="text-sm text-gray-500">
-                    Joined {formatDate(userProfile.created_at)}
+                    {/* Expanded client list */}
+                    {isExpanded && (
+                      <div className="bg-gray-50 border-t border-gray-100 px-6 py-4">
+                        {clientsLoading ? (
+                          <div className="flex justify-center py-6">
+                            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-indigo-500" />
+                          </div>
+                        ) : userClients.length === 0 ? (
+                          <p className="text-sm text-gray-400 text-center py-4">
+                            No clients for this user
+                          </p>
+                        ) : (
+                          <div className="space-y-2">
+                            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">
+                              {userClients.length} Client{userClients.length !== 1 ? 's' : ''}
+                            </p>
+                            {userClients.map((client) => (
+                              <div
+                                key={client.id}
+                                className="flex items-center justify-between bg-white rounded-xl border border-gray-200 px-4 py-3"
+                              >
+                                <div className="min-w-0 flex-1">
+                                  <p className="text-sm font-semibold text-gray-900">{client.name}</p>
+                                  {client.description && (
+                                    <p className="text-xs text-gray-400 mt-0.5 truncate">{client.description}</p>
+                                  )}
+                                </div>
+                                <a
+                                  href={`/clients/${client.id}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="flex items-center gap-1 text-xs text-indigo-600 hover:text-indigo-700 font-medium ml-3 flex-shrink-0"
+                                >
+                                  Open <ExternalLink size={11} />
+                                </a>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
-                </button>
-              ))}
-
-              {users.length === 0 && (
-                <div className="text-center py-8 text-gray-500">
-                  No users found
-                </div>
-              )}
+                )
+              })}
             </div>
-          </div>
+          )}
         </div>
-      )}
+      </div>
     </div>
   )
 }
