@@ -7,4 +7,52 @@ body {
 
 #root {
   min-height: 100vh;
+  height: 100vh;
+}
+
+/* ── Custom range slider ─────────────────────────────────── */
+.slider {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 5px;
+  border-radius: 9999px;
+  background: #e5e7eb;
+  outline: none;
+  cursor: pointer;
+}
+
+.slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #4f46e5;
+  cursor: pointer;
+  box-shadow: 0 1px 4px rgba(79, 70, 229, 0.4);
+  transition: transform 0.1s ease, box-shadow 0.1s ease;
+}
+
+.slider::-webkit-slider-thumb:hover {
+  transform: scale(1.2);
+  box-shadow: 0 2px 8px rgba(79, 70, 229, 0.5);
+}
+
+.slider::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #4f46e5;
+  cursor: pointer;
+  border: none;
+  box-shadow: 0 1px 4px rgba(79, 70, 229, 0.4);
+}
+
+/* Hide number input spinners */
+input[type='number']::-webkit-inner-spin-button,
+input[type='number']::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type='number'] {
+  -moz-appearance: textfield;
 }

@@ -1,81 +1,64 @@
-import { useEffect, useCallback } from 'react'
 import { Link } from 'react-router-dom'
+import { TrendingUp, Plus, BarChart2 } from 'lucide-react'
 import Layout from '../components/Layout'
-import SearchBar from '../components/SearchBar'
-import ProspectList from '../components/ProspectList'
-import { useProspects } from '../hooks/useProspects'
+import { useClients } from '../hooks/useClients'
 
 export default function Dashboard() {
-  const { prospects, loading, error, loadProspects, searchProspects, deleteProspect } = useProspects()
-
-  useEffect(() => {
-    loadProspects()
-  }, [loadProspects])
-
-  const handleSearch = useCallback((query, status) => {
-    if (query || (status && status !== 'all')) {
-      searchProspects(query, status)
-    } else {
-      loadProspects()
-    }
-  }, [searchProspects, loadProspects])
-
-  const handleDelete = useCallback(async (id) => {
-    await deleteProspect(id)
-  }, [deleteProspect])
+  const { clients, loading } = useClients()
 
   return (
     <Layout>
-      <div className="space-y-6">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Prospects</h1>
-            <p className="text-sm text-gray-500 mt-1">
-              Manage your sales prospects and track funnel metrics
-            </p>
+      <div className="h-full flex items-center justify-center p-8">
+        <div className="text-center max-w-lg">
+          <div className="w-16 h-16 bg-indigo-100 rounded-2xl flex items-center justify-center mx-auto mb-5">
+            <TrendingUp size={32} className="text-indigo-600" />
           </div>
-          <Link
-            to="/prospect/new"
-            className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-medium"
-          >
-            <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-            </svg>
-            New Prospect
-          </Link>
+
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">
+            Business Profitability Simulator
+          </h1>
+
+          {loading ? (
+            <p className="text-gray-400 text-sm">Loading clients…</p>
+          ) : clients.length === 0 ? (
+            <>
+              <p className="text-gray-500 mb-6">
+                Create your first client to start simulating profitability scenarios. Adjust inputs with live sliders and see results instantly.
+              </p>
+              <Link
+                to="/clients/new"
+                className="inline-flex items-center gap-2 px-6 py-3 bg-indigo-600 text-white rounded-xl font-medium hover:bg-indigo-700 transition-colors"
+              >
+                <Plus size={18} />
+                Create First Client
+              </Link>
+            </>
+          ) : (
+            <>
+              <p className="text-gray-500 mb-6">
+                Select a client from the sidebar, or create a new one.
+              </p>
+              <div className="grid grid-cols-2 gap-3 text-left">
+                {clients.slice(0, 6).map((client) => (
+                  <Link
+                    key={client.id}
+                    to={`/clients/${client.id}`}
+                    className="p-4 bg-white rounded-xl border border-gray-200 hover:border-indigo-300 hover:shadow-sm transition-all group"
+                  >
+                    <BarChart2 size={18} className="text-indigo-400 mb-2 group-hover:text-indigo-600 transition-colors" />
+                    <p className="text-sm font-semibold text-gray-900 truncate">{client.name}</p>
+                    {client.description && (
+                      <p className="text-xs text-gray-400 mt-0.5 truncate">{client.description}</p>
+                    )}
+                  </Link>
+                ))}
+              </div>
+              {clients.length > 6 && (
+                <p className="text-xs text-gray-400 mt-3">{clients.length - 6} more in sidebar</p>
+              )}
+            </>
+          )}
         </div>
-
-        {/* Search and Filter */}
-        <SearchBar onSearch={handleSearch} />
-
-        {/* Error State */}
-        {error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
-            {error}
-          </div>
-        )}
-
-        {/* Prospect List */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-          <ProspectList
-            prospects={prospects}
-            loading={loading}
-            onDelete={handleDelete}
-          />
-        </div>
-
-        {/* Legend */}
-        {prospects.length > 0 && (
-          <div className="text-sm text-gray-500 flex items-center space-x-4">
-            <span>Legend:</span>
-            <span><span className="mr-1">🟢</span>Won</span>
-            <span><span className="mr-1">🟡</span>In Progress</span>
-            <span><span className="mr-1">🔵</span>Contacted</span>
-            <span><span className="mr-1">⚪</span>New</span>
-            <span><span className="mr-1">🔴</span>Lost</span>
-          </div>
-        )}
       </div>
     </Layout>
   )
