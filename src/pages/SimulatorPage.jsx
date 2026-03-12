@@ -251,19 +251,13 @@ export default function SimulatorPage() {
   const [saveMsg, setSaveMsg] = useState(null)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
 
+  // Reinitialize state when client data loads or changes (including when navigating between clients)
   useEffect(() => {
-    if (client && inputs === null) {
+    if (client && client.id === id) {
       setInputs(dbToInputs(client))
       setNameInput(client.name)
     }
-  }, [client, inputs])
-
-  useEffect(() => {
-    if (client) {
-      setInputs(null)
-      setNameInput(client.name)
-    }
-  }, [id])
+  }, [client, id])
 
   const results = useMemo(() => (inputs ? calculate(inputs) : null), [inputs])
 
