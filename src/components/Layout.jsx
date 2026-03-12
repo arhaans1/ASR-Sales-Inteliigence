@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
-import { TrendingUp, BarChart2, Plus, LogOut, ChevronRight, PanelLeftClose, PanelLeft, ChevronDown, User } from 'lucide-react'
+import { BarChart2, Plus, LogOut, ChevronRight, PanelLeftClose, PanelLeft, ChevronDown } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
 
@@ -30,8 +30,10 @@ export default function Layout({ children }) {
           .order('email')
         if (error) throw error
         setAdmins(data || [])
-        // Default to first admin or current user
-        if (data?.length > 0) {
+        // Default to current user
+        if (user?.id) {
+          setSelectedAdminId(user.id)
+        } else if (data?.length > 0) {
           setSelectedAdminId(data[0].user_id)
         }
       } catch (err) {
@@ -40,7 +42,7 @@ export default function Layout({ children }) {
     }
 
     fetchAdmins()
-  }, [isSuperadmin])
+  }, [isSuperadmin, user?.id])
 
   // Fetch clients based on selected admin (superadmin) or current user
   useEffect(() => {
@@ -81,24 +83,42 @@ export default function Layout({ children }) {
       {/* ── Sidebar ── */}
       <aside
         className={`bg-white border-r border-gray-200 flex flex-col flex-shrink-0 transition-all duration-200 ${
-          sidebarOpen ? 'w-60' : 'w-0 overflow-hidden'
+          sidebarOpen ? 'w-60' : 'w-14'
         }`}
       >
         {/* Logo - Clickable */}
-        <Link to="/" className="p-5 border-b border-gray-100 hover:bg-gray-50 transition-colors">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center flex-shrink-0">
-              <TrendingUp size={15} className="text-white" />
+        <div className="flex items-center border-b border-gray-100">
+          <Link to="/" className="flex-1 p-4 hover:bg-gray-50 transition-colors">
+            <div className="flex items-center gap-2.5">
+              <img
+                src="/asr-logo.svg"
+                alt="ASR"
+                className="w-8 h-8 rounded-full flex-shrink-0"
+              />
+              {sidebarOpen && (
+                <div className="leading-tight">
+                  <p className="text-xs font-bold text-gray-900">Profit Simulator</p>
+                  <p className="text-[11px] text-gray-400">ASR Media Pro</p>
+                </div>
+              )}
             </div>
-            <div className="leading-tight">
-              <p className="text-xs font-bold text-gray-900">Profit Simulator</p>
-              <p className="text-[11px] text-gray-400">Business Intelligence</p>
-            </div>
-          </div>
-        </Link>
+          </Link>
+          {/* Toggle inside header */}
+          <button
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+            className="p-2 mr-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+            title={sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'}
+          >
+            {sidebarOpen ? (
+              <PanelLeftClose size={16} />
+            ) : (
+              <PanelLeft size={16} />
+            )}
+          </button>
+        </div>
 
         {/* Superadmin: Admin Selector */}
-        {isSuperadmin && admins.length > 0 && (
+        {sidebarOpen && isSuperadmin && admins.length > 0 && (
           <div className="px-3 py-2 border-b border-gray-100">
             <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1.5 px-1">
               Viewing as
@@ -139,34 +159,50 @@ export default function Layout({ children }) {
 
         {/* Client list */}
         <div className="flex-1 overflow-y-auto p-3">
-          <div className="flex items-center justify-between mb-2 px-1">
-            <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">
-              Clients
-            </span>
-            <Link
-              to="/clients/new"
-              className="flex items-center gap-0.5 text-xs text-indigo-600 hover:text-indigo-700 font-medium"
-            >
-              <Plus size={13} />
-              New
-            </Link>
-          </div>
+          {sidebarOpen && (
+            <div className="flex items-center justify-between mb-2 px-1">
+              <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">
+                Clients
+              </span>
+              <Link
+                to="/clients/new"
+                className="flex items-center gap-0.5 text-xs text-indigo-600 hover:text-indigo-700 font-medium"
+              >
+                <Plus size={13} />
+                New
+              </Link>
+            </div>
+          )}
+
+          {!sidebarOpen && (
+            <div className="flex justify-center mb-2">
+              <Link
+                to="/clients/new"
+                className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                title="New client"
+              >
+                <Plus size={16} />
+              </Link>
+            </div>
+          )}
 
           {loading ? (
             <div className="flex justify-center py-8">
               <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-indigo-500" />
             </div>
           ) : clients.length === 0 ? (
-            <div className="text-center py-8 px-2">
-              <BarChart2 size={28} className="mx-auto text-gray-200 mb-2" />
-              <p className="text-xs text-gray-400 mb-1">No clients yet</p>
-              <Link
-                to="/clients/new"
-                className="text-xs text-indigo-600 hover:text-indigo-700 font-medium"
-              >
-                Create first client
-              </Link>
-            </div>
+            sidebarOpen ? (
+              <div className="text-center py-8 px-2">
+                <BarChart2 size={28} className="mx-auto text-gray-200 mb-2" />
+                <p className="text-xs text-gray-400 mb-1">No clients yet</p>
+                <Link
+                  to="/clients/new"
+                  className="text-xs text-indigo-600 hover:text-indigo-700 font-medium"
+                >
+                  Create first client
+                </Link>
+              </div>
+            ) : null
           ) : (
             <nav className="space-y-0.5">
               {clients.map((client) => {
@@ -180,13 +216,18 @@ export default function Layout({ children }) {
                         ? 'bg-indigo-50 text-indigo-700 font-medium'
                         : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
                     }`}
+                    title={!sidebarOpen ? client.name : undefined}
                   >
                     <BarChart2
                       size={14}
                       className={isActive ? 'text-indigo-500 flex-shrink-0' : 'text-gray-300 flex-shrink-0'}
                     />
-                    <span className="flex-1 truncate">{client.name}</span>
-                    {isActive && <ChevronRight size={13} className="text-indigo-300 flex-shrink-0" />}
+                    {sidebarOpen && (
+                      <>
+                        <span className="flex-1 truncate">{client.name}</span>
+                        {isActive && <ChevronRight size={13} className="text-indigo-300 flex-shrink-0" />}
+                      </>
+                    )}
                   </Link>
                 )
               })}
@@ -196,44 +237,35 @@ export default function Layout({ children }) {
 
         {/* User footer */}
         <div className="p-3 border-t border-gray-100">
-          <div className="flex items-center gap-2 px-2">
+          <div className={`flex items-center gap-2 ${sidebarOpen ? 'px-2' : 'justify-center'}`}>
             <Link
               to="/account"
-              className="flex items-center gap-2 flex-1 min-w-0 hover:bg-gray-50 rounded-lg p-1 -m-1 transition-colors"
+              className={`flex items-center gap-2 ${sidebarOpen ? 'flex-1 min-w-0' : ''} hover:bg-gray-50 rounded-lg p-1 -m-1 transition-colors`}
+              title={!sidebarOpen ? user?.email : undefined}
             >
               <div className="w-7 h-7 bg-indigo-100 rounded-full flex items-center justify-center flex-shrink-0">
                 <span className="text-xs font-semibold text-indigo-600">
                   {(user?.email?.[0] ?? '?').toUpperCase()}
                 </span>
               </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-xs font-medium text-gray-800 truncate">{user?.email}</p>
-              </div>
+              {sidebarOpen && (
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-medium text-gray-800 truncate">{user?.email}</p>
+                </div>
+              )}
             </Link>
-            <button
-              onClick={handleSignOut}
-              className="p-1.5 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-              title="Sign out"
-            >
-              <LogOut size={14} />
-            </button>
+            {sidebarOpen && (
+              <button
+                onClick={handleSignOut}
+                className="p-1.5 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                title="Sign out"
+              >
+                <LogOut size={14} />
+              </button>
+            )}
           </div>
         </div>
       </aside>
-
-      {/* ── Sidebar Toggle ── */}
-      <button
-        onClick={() => setSidebarOpen(!sidebarOpen)}
-        className="absolute top-4 left-4 z-10 p-2 bg-white border border-gray-200 rounded-lg shadow-sm hover:bg-gray-50 transition-colors"
-        style={{ left: sidebarOpen ? '252px' : '8px' }}
-        title={sidebarOpen ? 'Hide sidebar' : 'Show sidebar'}
-      >
-        {sidebarOpen ? (
-          <PanelLeftClose size={16} className="text-gray-500" />
-        ) : (
-          <PanelLeft size={16} className="text-gray-500" />
-        )}
-      </button>
 
       {/* ── Main content ── */}
       <main className="flex-1 overflow-y-auto">{children}</main>
