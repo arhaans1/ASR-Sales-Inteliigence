@@ -1,138 +1,109 @@
 import { createContext, useContext, useEffect, useState } from 'react'
-import { supabase, onAuthStateChange, signIn as supabaseSignIn, signUp as supabaseSignUp, signOut as supabaseSignOut } from '../lib/supabase'
+import { supabase } from '../lib/supabase'
+import { hashPassword, verifyPassword, saveSession, getSession, clearSession } from '../lib/auth'
 
 const AuthContext = createContext({})
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
-  const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
 
-  const fetchProfile = async (userId) => {
-    if (!userId) {
-      setProfile(null)
-      return
-    }
-
-    try {
-      // Try to get user profile with a timeout
-      const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('Timeout')), 5000)
-      )
-
-      const queryPromise = supabase
-        .from('user_profiles')
-        .select('*')
-        .eq('user_id', userId)
-        .single()
-
-      const { data, error } = await Promise.race([queryPromise, timeoutPromise])
-
-      if (error) {
-        console.log('Profile fetch error (non-critical):', error.message)
-        setProfile(null)
-      } else {
-        setProfile(data)
-      }
-    } catch (err) {
-      // Silently fail - superadmin features just won't work
-      console.log('Could not fetch profile:', err.message)
-      setProfile(null)
-    }
-  }
-
+  // Load session on mount
   useEffect(() => {
-    let isMounted = true
-
-    // Force loading to false after 5 seconds no matter what
-    const forceLoadingTimeout = setTimeout(() => {
-      if (isMounted && loading) {
-        console.log('Force ending loading state')
-        setLoading(false)
-      }
-    }, 5000)
-
-    // Get initial session
-    const initAuth = async () => {
-      try {
-        const { data: { session }, error } = await supabase.auth.getSession()
-
-        if (!isMounted) return
-
-        if (error) {
-          console.error('Session error:', error)
-          setUser(null)
-          setLoading(false)
-          return
-        }
-
-        setUser(session?.user ?? null)
-
-        if (session?.user) {
-          // Don't wait for profile - just fire and forget
-          fetchProfile(session.user.id)
-        }
-      } catch (err) {
-        console.error('Auth init error:', err)
-      } finally {
-        if (isMounted) {
-          setLoading(false)
-        }
-      }
+    const session = getSession()
+    if (session) {
+      setUser(session)
     }
-
-    initAuth()
-
-    // Listen for auth changes
-    const { data: { subscription } } = onAuthStateChange(async (_event, session) => {
-      if (!isMounted) return
-
-      setUser(session?.user ?? null)
-
-      if (session?.user) {
-        fetchProfile(session.user.id)
-      } else {
-        setProfile(null)
-      }
-
-      setLoading(false)
-    })
-
-    return () => {
-      isMounted = false
-      clearTimeout(forceLoadingTimeout)
-      subscription.unsubscribe()
-    }
+    setLoading(false)
   }, [])
 
+  // Sign in with email and password against user_profiles table
   const signIn = async (email, password) => {
-    const { data, error } = await supabaseSignIn(email, password)
-    if (error) throw error
-    return data
+    // Look up user in user_profiles
+    const { data: profile, error } = await supabase
+      .from('user_profiles')
+      .select('*')
+      .eq('email', email.toLowerCase().trim())
+      .single()
+
+    if (error || !profile) {
+      throw new Error('Invalid login credentials')
+    }
+
+    // Check password
+    if (!profile.password_hash) {
+      throw new Error('Account not set up. Please contact admin.')
+    }
+
+    const isValid = await verifyPassword(password, profile.password_hash)
+    if (!isValid) {
+      throw new Error('Invalid login credentials')
+    }
+
+    // Create session
+    const sessionUser = {
+      id: profile.user_id,
+      email: profile.email,
+      is_superadmin: profile.is_superadmin || false
+    }
+
+    saveSession(sessionUser)
+    setUser(sessionUser)
+
+    return sessionUser
   }
 
-  const signUp = async (email, password) => {
-    const { data, error } = await supabaseSignUp(email, password)
-    if (error) throw error
-    return data
-  }
-
+  // Sign out
   const signOut = async () => {
-    const { error } = await supabaseSignOut()
-    if (error) throw error
+    clearSession()
     setUser(null)
-    setProfile(null)
+  }
+
+  // Create a new user (superadmin only)
+  const createUser = async (email, password) => {
+    const passwordHash = await hashPassword(password)
+    const userId = crypto.randomUUID()
+
+    const { error } = await supabase
+      .from('user_profiles')
+      .insert({
+        user_id: userId,
+        email: email.toLowerCase().trim(),
+        password_hash: passwordHash,
+        is_superadmin: false
+      })
+
+    if (error) {
+      if (error.code === '23505') {
+        throw new Error('A user with this email already exists')
+      }
+      throw error
+    }
+
+    return { user_id: userId, email }
+  }
+
+  // Update user password (for password reset)
+  const updatePassword = async (userId, newPassword) => {
+    const passwordHash = await hashPassword(newPassword)
+
+    const { error } = await supabase
+      .from('user_profiles')
+      .update({ password_hash: passwordHash })
+      .eq('user_id', userId)
+
+    if (error) throw error
   }
 
   const value = {
     user,
-    profile,
     loading,
     signIn,
-    signUp,
     signOut,
+    createUser,
+    updatePassword,
     isAuthenticated: !!user,
-    isSuperadmin: profile?.is_superadmin ?? false
+    isSuperadmin: user?.is_superadmin ?? false
   }
 
   return (
