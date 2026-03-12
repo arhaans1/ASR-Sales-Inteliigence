@@ -1,9 +1,10 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import Login from './pages/Login'
-import Dashboard from './pages/Dashboard'
+import HomePage from './pages/HomePage'
 import SimulatorPage from './pages/SimulatorPage'
 import CreateClient from './pages/CreateClient'
+import AccountPage from './pages/AccountPage'
 import AdminLogin from './pages/AdminLogin'
 import AdminDashboard from './pages/AdminDashboard'
 
@@ -59,9 +60,10 @@ function AppRoutes() {
     <Routes>
       {/* Regular user routes */}
       <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
-      <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+      <Route path="/" element={<ProtectedRoute><HomePage /></ProtectedRoute>} />
       <Route path="/clients/new" element={<ProtectedRoute><CreateClient /></ProtectedRoute>} />
       <Route path="/clients/:id" element={<ProtectedRoute><SimulatorPage /></ProtectedRoute>} />
+      <Route path="/account" element={<ProtectedRoute><AccountPage /></ProtectedRoute>} />
 
       {/* Admin routes */}
       <Route path="/admin/login" element={<AdminPublicRoute><AdminLogin /></AdminPublicRoute>} />
