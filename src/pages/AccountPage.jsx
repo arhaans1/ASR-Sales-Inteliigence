@@ -128,14 +128,16 @@ function ProfileTab() {
 // ── Edit User Modal ───────────────────────────────────────────
 function EditUserModal({ user: editUser, onClose, onSave }) {
   const [email, setEmail] = useState(editUser?.email || '')
-  const [newPassword, setNewPassword] = useState('')
   const [saving, setSaving] = useState(false)
+  const [sendingReset, setSendingReset] = useState(false)
   const [error, setError] = useState(null)
+  const [success, setSuccess] = useState(null)
 
   const handleSave = async (e) => {
     e.preventDefault()
     setSaving(true)
     setError(null)
+    setSuccess(null)
 
     try {
       // Update email in user_profiles table
@@ -156,6 +158,24 @@ function EditUserModal({ user: editUser, onClose, onSave }) {
     }
   }
 
+  const handleSendPasswordReset = async () => {
+    setSendingReset(true)
+    setError(null)
+    setSuccess(null)
+
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(editUser.email, {
+        redirectTo: `${window.location.origin}/login`,
+      })
+      if (error) throw error
+      setSuccess(`Password reset email sent to ${editUser.email}`)
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setSendingReset(false)
+    }
+  }
+
   return (
     <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl p-6 max-w-md w-full shadow-xl">
@@ -172,6 +192,12 @@ function EditUserModal({ user: editUser, onClose, onSave }) {
           </div>
         )}
 
+        {success && (
+          <div className="mb-4 p-3 bg-green-50 text-green-700 text-sm rounded-lg border border-green-200">
+            {success}
+          </div>
+        )}
+
         <form onSubmit={handleSave} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
@@ -183,22 +209,23 @@ function EditUserModal({ user: editUser, onClose, onSave }) {
               required
             />
           </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              New Password <span className="text-gray-400 font-normal">(leave blank to keep current)</span>
-            </label>
-            <input
-              type="password"
-              value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
-              className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
-              placeholder="Minimum 6 characters"
-              minLength={6}
-            />
-            <p className="text-xs text-gray-400 mt-1">
-              Note: Password changes require the user to reset via email
+
+          {/* Password Reset Section */}
+          <div className="border-t border-gray-100 pt-4">
+            <label className="block text-sm font-medium text-gray-700 mb-2">Password</label>
+            <button
+              type="button"
+              onClick={handleSendPasswordReset}
+              disabled={sendingReset}
+              className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50 transition-colors"
+            >
+              {sendingReset ? 'Sending...' : 'Send Password Reset Email'}
+            </button>
+            <p className="text-xs text-gray-400 mt-2">
+              The user will receive an email with a link to set a new password.
             </p>
           </div>
+
           <div className="flex gap-3 pt-2">
             <button
               type="button"
