@@ -3,31 +3,22 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 
 export default function Login() {
-  const [isSignUp, setIsSignUp] = useState(false)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-  const [message, setMessage] = useState('')
 
-  const { signIn, signUp } = useAuth()
+  const { signIn } = useAuth()
   const navigate = useNavigate()
 
   const handleSubmit = async (e) => {
     e.preventDefault()
     setError('')
-    setMessage('')
     setLoading(true)
 
     try {
-      if (isSignUp) {
-        await signUp(email, password)
-        setMessage('Check your email for the confirmation link!')
-        setIsSignUp(false)
-      } else {
-        await signIn(email, password)
-        navigate('/')
-      }
+      await signIn(email, password)
+      navigate('/')
     } catch (err) {
       setError(err.message || 'An error occurred')
     } finally {
@@ -40,10 +31,10 @@ export default function Login() {
       <div className="max-w-md w-full space-y-8">
         <div>
           <h1 className="text-center text-3xl font-bold text-indigo-600">
-            Prospect Tracker
+            Profit Simulator
           </h1>
           <h2 className="mt-6 text-center text-2xl font-bold text-gray-900">
-            {isSignUp ? 'Create your account' : 'Sign in to your account'}
+            Sign in to your account
           </h2>
         </div>
 
@@ -51,12 +42,6 @@ export default function Login() {
           {error && (
             <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
               {error}
-            </div>
-          )}
-
-          {message && (
-            <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg text-sm">
-              {message}
             </div>
           )}
 
@@ -86,13 +71,12 @@ export default function Login() {
                 id="password"
                 name="password"
                 type="password"
-                autoComplete={isSignUp ? 'new-password' : 'current-password'}
+                autoComplete="current-password"
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="mt-1 block w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                 placeholder="Enter your password"
-                minLength={6}
               />
             </div>
           </div>
@@ -109,30 +93,17 @@ export default function Login() {
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                   </svg>
-                  Processing...
+                  Signing in...
                 </span>
               ) : (
-                isSignUp ? 'Sign Up' : 'Sign In'
+                'Sign In'
               )}
             </button>
           </div>
 
-          <div className="text-center">
-            <button
-              type="button"
-              onClick={() => {
-                setIsSignUp(!isSignUp)
-                setError('')
-                setMessage('')
-              }}
-              className="text-sm text-indigo-600 hover:text-indigo-500"
-            >
-              {isSignUp
-                ? 'Already have an account? Sign in'
-                : "Don't have an account? Sign up"
-              }
-            </button>
-          </div>
+          <p className="text-center text-sm text-gray-500">
+            Contact your administrator for access
+          </p>
         </form>
       </div>
     </div>

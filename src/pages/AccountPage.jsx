@@ -4,32 +4,15 @@ import { useNavigate } from 'react-router-dom'
 import Layout from '../components/Layout'
 import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
+import { hashPassword } from '../lib/auth'
 
 // ── Profile Tab ───────────────────────────────────────────────
 function ProfileTab() {
-  const { user } = useAuth()
-  const [email, setEmail] = useState(user?.email || '')
+  const { user, updatePassword } = useAuth()
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState(null)
-
-  const handleUpdateEmail = async (e) => {
-    e.preventDefault()
-    if (!email.trim()) return
-    setSaving(true)
-    setMessage(null)
-
-    try {
-      const { error } = await supabase.auth.updateUser({ email })
-      if (error) throw error
-      setMessage({ type: 'success', text: 'Email update requested. Check your inbox to confirm.' })
-    } catch (err) {
-      setMessage({ type: 'error', text: err.message })
-    } finally {
-      setSaving(false)
-    }
-  }
 
   const handleUpdatePassword = async (e) => {
     e.preventDefault()
@@ -46,8 +29,7 @@ function ProfileTab() {
     setMessage(null)
 
     try {
-      const { error } = await supabase.auth.updateUser({ password: newPassword })
-      if (error) throw error
+      await updatePassword(user.id, newPassword)
       setMessage({ type: 'success', text: 'Password updated successfully!' })
       setNewPassword('')
       setConfirmPassword('')
@@ -60,28 +42,18 @@ function ProfileTab() {
 
   return (
     <div className="space-y-8">
-      {/* Email Section */}
+      {/* Email Display */}
       <div className="bg-white rounded-xl border border-gray-200 p-6">
         <h3 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
           <Mail size={16} className="text-gray-400" />
           Email Address
         </h3>
-        <form onSubmit={handleUpdateEmail} className="space-y-4">
-          <input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
-            placeholder="your@email.com"
-          />
-          <button
-            type="submit"
-            disabled={saving || email === user?.email}
-            className="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition-colors"
-          >
-            Update Email
-          </button>
-        </form>
+        <p className="text-sm text-gray-700 bg-gray-50 px-4 py-2.5 rounded-xl">
+          {user?.email}
+        </p>
+        <p className="text-xs text-gray-400 mt-2">
+          Contact your administrator to change your email address.
+        </p>
       </div>
 
       {/* Password Section */}
@@ -128,8 +100,8 @@ function ProfileTab() {
 // ── Edit User Modal ───────────────────────────────────────────
 function EditUserModal({ user: editUser, onClose, onSave }) {
   const [email, setEmail] = useState(editUser?.email || '')
+  const [newPassword, setNewPassword] = useState('')
   const [saving, setSaving] = useState(false)
-  const [sendingReset, setSendingReset] = useState(false)
   const [error, setError] = useState(null)
   const [success, setSuccess] = useState(null)
 
@@ -140,39 +112,39 @@ function EditUserModal({ user: editUser, onClose, onSave }) {
     setSuccess(null)
 
     try {
-      // Update email in user_profiles table
+      const updates = {}
+
+      // Update email if changed
       if (email !== editUser.email) {
+        updates.email = email.toLowerCase().trim()
+      }
+
+      // Update password if provided
+      if (newPassword) {
+        if (newPassword.length < 6) {
+          throw new Error('Password must be at least 6 characters')
+        }
+        updates.password_hash = await hashPassword(newPassword)
+      }
+
+      // Only update if there are changes
+      if (Object.keys(updates).length > 0) {
         const { error: updateError } = await supabase
           .from('user_profiles')
-          .update({ email })
+          .update(updates)
           .eq('user_id', editUser.user_id)
         if (updateError) throw updateError
       }
 
-      onSave()
-      onClose()
+      setSuccess('User updated successfully!')
+      setTimeout(() => {
+        onSave()
+        onClose()
+      }, 1000)
     } catch (err) {
       setError(err.message)
     } finally {
       setSaving(false)
-    }
-  }
-
-  const handleSendPasswordReset = async () => {
-    setSendingReset(true)
-    setError(null)
-    setSuccess(null)
-
-    try {
-      const { error } = await supabase.auth.resetPasswordForEmail(editUser.email, {
-        redirectTo: `${window.location.origin}/login`,
-      })
-      if (error) throw error
-      setSuccess(`Password reset email sent to ${editUser.email}`)
-    } catch (err) {
-      setError(err.message)
-    } finally {
-      setSendingReset(false)
     }
   }
 
@@ -210,20 +182,18 @@ function EditUserModal({ user: editUser, onClose, onSave }) {
             />
           </div>
 
-          {/* Password Reset Section */}
-          <div className="border-t border-gray-100 pt-4">
-            <label className="block text-sm font-medium text-gray-700 mb-2">Password</label>
-            <button
-              type="button"
-              onClick={handleSendPasswordReset}
-              disabled={sendingReset}
-              className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50 transition-colors"
-            >
-              {sendingReset ? 'Sending...' : 'Send Password Reset Email'}
-            </button>
-            <p className="text-xs text-gray-400 mt-2">
-              The user will receive an email with a link to set a new password.
-            </p>
+          {/* Password Section */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              New Password <span className="text-gray-400 font-normal">(leave blank to keep current)</span>
+            </label>
+            <input
+              type="password"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+              placeholder="Minimum 6 characters"
+            />
           </div>
 
           <div className="flex gap-3 pt-2">
@@ -250,7 +220,7 @@ function EditUserModal({ user: editUser, onClose, onSave }) {
 
 // ── Users Tab (Superadmin only) ───────────────────────────────
 function UsersTab() {
-  const { user: currentUser } = useAuth()
+  const { user: currentUser, createUser } = useAuth()
   const [users, setUsers] = useState([])
   const [loading, setLoading] = useState(true)
   const [showCreateModal, setShowCreateModal] = useState(false)
@@ -286,34 +256,17 @@ function UsersTab() {
     e.preventDefault()
     if (!newEmail.trim() || !newPassword) return
 
+    if (newPassword.length < 6) {
+      setMessage({ type: 'error', text: 'Password must be at least 6 characters' })
+      return
+    }
+
     setCreating(true)
     setMessage(null)
 
     try {
-      // Step 1: Create user in Supabase Auth
-      const { data, error } = await supabase.auth.signUp({
-        email: newEmail,
-        password: newPassword,
-      })
-      if (error) throw error
-
-      // Step 2: Also create entry in user_profiles table so they appear in the list
-      if (data?.user?.id) {
-        const { error: profileError } = await supabase
-          .from('user_profiles')
-          .insert({
-            user_id: data.user.id,
-            email: newEmail,
-            is_superadmin: false,
-          })
-
-        if (profileError) {
-          console.error('Error creating user profile:', profileError)
-          // Don't throw - user was created in auth, profile insert may fail due to RLS or duplicates
-        }
-      }
-
-      setMessage({ type: 'success', text: `User ${newEmail} created! They should check their email to confirm.` })
+      await createUser(newEmail, newPassword)
+      setMessage({ type: 'success', text: `User ${newEmail} created successfully! They can now login.` })
       setNewEmail('')
       setNewPassword('')
       setShowCreateModal(false)
