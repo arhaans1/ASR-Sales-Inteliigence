@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { ArrowLeft, User, Users, Save, Plus, Trash2, Mail, Lock, Shield } from 'lucide-react'
+import { ArrowLeft, User, Users, Plus, Trash2, Mail, Lock, Shield, Pencil, X } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import Layout from '../components/Layout'
 import { useAuth } from '../context/AuthContext'
@@ -9,7 +9,6 @@ import { supabase } from '../lib/supabase'
 function ProfileTab() {
   const { user } = useAuth()
   const [email, setEmail] = useState(user?.email || '')
-  const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [saving, setSaving] = useState(false)
@@ -50,7 +49,6 @@ function ProfileTab() {
       const { error } = await supabase.auth.updateUser({ password: newPassword })
       if (error) throw error
       setMessage({ type: 'success', text: 'Password updated successfully!' })
-      setCurrentPassword('')
       setNewPassword('')
       setConfirmPassword('')
     } catch (err) {
@@ -127,14 +125,114 @@ function ProfileTab() {
   )
 }
 
+// ── Edit User Modal ───────────────────────────────────────────
+function EditUserModal({ user: editUser, onClose, onSave }) {
+  const [email, setEmail] = useState(editUser?.email || '')
+  const [newPassword, setNewPassword] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState(null)
+
+  const handleSave = async (e) => {
+    e.preventDefault()
+    setSaving(true)
+    setError(null)
+
+    try {
+      // Update email in user_profiles table
+      if (email !== editUser.email) {
+        const { error: updateError } = await supabase
+          .from('user_profiles')
+          .update({ email })
+          .eq('user_id', editUser.user_id)
+        if (updateError) throw updateError
+      }
+
+      onSave()
+      onClose()
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl p-6 max-w-md w-full shadow-xl">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-bold text-gray-900">Edit User</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            <X size={20} />
+          </button>
+        </div>
+
+        {error && (
+          <div className="mb-4 p-3 bg-red-50 text-red-700 text-sm rounded-lg border border-red-200">
+            {error}
+          </div>
+        )}
+
+        <form onSubmit={handleSave} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              New Password <span className="text-gray-400 font-normal">(leave blank to keep current)</span>
+            </label>
+            <input
+              type="password"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+              placeholder="Minimum 6 characters"
+              minLength={6}
+            />
+            <p className="text-xs text-gray-400 mt-1">
+              Note: Password changes require the user to reset via email
+            </p>
+          </div>
+          <div className="flex gap-3 pt-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 px-4 py-2 border border-gray-200 rounded-lg text-sm text-gray-700 hover:bg-gray-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={saving}
+              className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-semibold hover:bg-indigo-700 disabled:opacity-50"
+            >
+              {saving ? 'Saving...' : 'Save Changes'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
 // ── Users Tab (Superadmin only) ───────────────────────────────
 function UsersTab() {
+  const { user: currentUser } = useAuth()
   const [users, setUsers] = useState([])
   const [loading, setLoading] = useState(true)
   const [showCreateModal, setShowCreateModal] = useState(false)
+  const [editingUser, setEditingUser] = useState(null)
+  const [deletingUser, setDeletingUser] = useState(null)
   const [newEmail, setNewEmail] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [creating, setCreating] = useState(false)
+  const [deleting, setDeleting] = useState(false)
   const [message, setMessage] = useState(null)
 
   const fetchUsers = async () => {
@@ -165,7 +263,6 @@ function UsersTab() {
     setMessage(null)
 
     try {
-      // Create user via Supabase Auth
       const { data, error } = await supabase.auth.signUp({
         email: newEmail,
         password: newPassword,
@@ -181,6 +278,31 @@ function UsersTab() {
       setMessage({ type: 'error', text: err.message })
     } finally {
       setCreating(false)
+    }
+  }
+
+  const handleDeleteUser = async () => {
+    if (!deletingUser) return
+
+    setDeleting(true)
+    setMessage(null)
+
+    try {
+      // Delete from user_profiles table
+      const { error } = await supabase
+        .from('user_profiles')
+        .delete()
+        .eq('user_id', deletingUser.user_id)
+
+      if (error) throw error
+
+      setMessage({ type: 'success', text: `User ${deletingUser.email} has been removed.` })
+      setDeletingUser(null)
+      fetchUsers()
+    } catch (err) {
+      setMessage({ type: 'error', text: err.message })
+    } finally {
+      setDeleting(false)
     }
   }
 
@@ -220,7 +342,7 @@ function UsersTab() {
         ) : (
           <div className="divide-y divide-gray-100">
             {users.map((u) => (
-              <div key={u.user_id} className="flex items-center justify-between px-5 py-4">
+              <div key={u.user_id} className="flex items-center justify-between px-5 py-4 hover:bg-gray-50">
                 <div className="flex items-center gap-3">
                   <div className="w-9 h-9 bg-indigo-100 rounded-full flex items-center justify-center">
                     <span className="text-sm font-semibold text-indigo-600">
@@ -230,14 +352,37 @@ function UsersTab() {
                   <div>
                     <p className="text-sm font-medium text-gray-900">{u.email || 'Unknown'}</p>
                     <p className="text-xs text-gray-400">
-                      {u.is_superadmin && <span className="text-indigo-600 font-medium">Superadmin</span>}
-                      {!u.is_superadmin && 'Admin'}
+                      {u.is_superadmin ? (
+                        <span className="text-indigo-600 font-medium">Superadmin</span>
+                      ) : (
+                        'Admin'
+                      )}
                     </p>
                   </div>
                 </div>
-                {u.is_superadmin && (
-                  <Shield size={16} className="text-indigo-400" />
-                )}
+                <div className="flex items-center gap-2">
+                  {u.is_superadmin && (
+                    <Shield size={16} className="text-indigo-400" />
+                  )}
+                  {/* Edit button */}
+                  <button
+                    onClick={() => setEditingUser(u)}
+                    className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                    title="Edit user"
+                  >
+                    <Pencil size={14} />
+                  </button>
+                  {/* Delete button - don't allow deleting yourself or other superadmins */}
+                  {u.user_id !== currentUser?.id && !u.is_superadmin && (
+                    <button
+                      onClick={() => setDeletingUser(u)}
+                      className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                      title="Delete user"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  )}
+                </div>
               </div>
             ))}
           </div>
@@ -248,7 +393,12 @@ function UsersTab() {
       {showCreateModal && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl p-6 max-w-md w-full shadow-xl">
-            <h3 className="text-lg font-bold text-gray-900 mb-4">Create New Admin User</h3>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold text-gray-900">Create New Admin User</h3>
+              <button onClick={() => setShowCreateModal(false)} className="text-gray-400 hover:text-gray-600">
+                <X size={20} />
+              </button>
+            </div>
             <form onSubmit={handleCreateUser} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
@@ -290,6 +440,47 @@ function UsersTab() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit User Modal */}
+      {editingUser && (
+        <EditUserModal
+          user={editingUser}
+          onClose={() => setEditingUser(null)}
+          onSave={fetchUsers}
+        />
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deletingUser && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-xl">
+            <div className="text-center">
+              <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Trash2 size={24} className="text-red-600" />
+              </div>
+              <h3 className="text-lg font-bold text-gray-900 mb-2">Delete User?</h3>
+              <p className="text-sm text-gray-500 mb-6">
+                Are you sure you want to delete <strong>{deletingUser.email}</strong>? This action cannot be undone.
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setDeletingUser(null)}
+                  className="flex-1 px-4 py-2 border border-gray-200 rounded-lg text-sm text-gray-700 hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleDeleteUser}
+                  disabled={deleting}
+                  className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-semibold hover:bg-red-700 disabled:opacity-50"
+                >
+                  {deleting ? 'Deleting...' : 'Delete'}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

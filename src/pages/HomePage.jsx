@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { Plus, TrendingUp, Calculator, Target, BarChart3 } from 'lucide-react'
+import { Plus, Calculator, Target, BarChart3 } from 'lucide-react'
 import Layout from '../components/Layout'
 
 export default function HomePage() {
@@ -9,9 +9,11 @@ export default function HomePage() {
         <div className="text-center max-w-lg">
           {/* Logo */}
           <div className="flex justify-center mb-6">
-            <div className="w-16 h-16 bg-indigo-600 rounded-2xl flex items-center justify-center shadow-lg shadow-indigo-200">
-              <TrendingUp size={32} className="text-white" />
-            </div>
+            <img
+              src="/asr-logo.svg"
+              alt="ASR Media Pro"
+              className="w-16 h-16 rounded-full shadow-lg"
+            />
           </div>
 
           {/* Title */}
