@@ -83,8 +83,12 @@ function ResultsSection({ title, icon: Icon, color, data, funnelType, inputs }) 
   const isWebinarDirect = funnelType === FUNNEL_TYPES.FREE_WEBINAR_DIRECT || funnelType === FUNNEL_TYPES.PAID_WEBINAR_DIRECT
   const isWebinarCall = funnelType === FUNNEL_TYPES.FREE_WEBINAR_CALL || funnelType === FUNNEL_TYPES.PAID_WEBINAR_CALL
 
-  const bgColor = color === 'indigo' ? 'bg-indigo-50 border-indigo-200' : 'bg-emerald-50 border-emerald-200'
-  const headerBg = color === 'indigo' ? 'bg-indigo-600' : 'bg-emerald-600'
+  const bgColor = color === 'indigo' ? 'bg-indigo-50 border-indigo-200'
+    : color === 'red' ? 'bg-red-50 border-red-200'
+    : 'bg-emerald-50 border-emerald-200'
+  const headerBg = color === 'indigo' ? 'bg-indigo-600'
+    : color === 'red' ? 'bg-red-600'
+    : 'bg-emerald-600'
 
   // Check if we have negative margin (unprofitable scenario)
   const hasNegativeMargin = data.hasNegativeMargin
@@ -278,6 +282,9 @@ export default function SimulatorPage() {
     const avgSale = inputs.avgSaleValue || 0
     const fixedExp = inputs.fixedMonthlyExpense || 0
     const hasNegativeMargin = results.hasNegativeMargin
+    const cac = safe(results.cac)
+    const commission = safe(results.commissionPerSale)
+    const marginPerSale = safe(results.marginPerSale)
 
     // For Profit Target
     let targetData = {}
@@ -285,25 +292,28 @@ export default function SimulatorPage() {
     let capacityData = {}
 
     if (isCallBooking) {
-      const targetSales = safe(Math.ceil(results.requiredSales))
-      const targetCalls = safe(results.callsNeededForProfit)
-      const capacitySales = safe(Math.floor(results.actualSalesAtCapacity))
+      // For call booking, always use capacity as the base when margin is negative
       const capacityCalls = safe(results.monthlyCapacity)
+      const capacitySales = safe(Math.floor(results.actualSalesAtCapacity))
+
+      // When margin is positive, calculate from profit target; when negative, show capacity scenario
+      const targetSales = hasNegativeMargin ? capacitySales : safe(Math.ceil(results.requiredSales))
+      const targetCalls = hasNegativeMargin ? capacityCalls : safe(results.callsNeededForProfit)
 
       targetData = {
-        dailyAdSpend: safe(results.dailyAdSpendForProfit),
-        monthlyAdSpend: safe(results.adSpendForProfit),
+        dailyAdSpend: hasNegativeMargin ? safe(results.dailyAdSpend) : safe(results.dailyAdSpendForProfit),
+        monthlyAdSpend: hasNegativeMargin ? safe(results.monthlyAdSpend) : safe(results.adSpendForProfit),
         callsPerDay: safe(Math.ceil(targetCalls / 30)),
         callsPerMonth: targetCalls,
         salesPerMonth: targetSales,
         revenue: targetSales * avgSale,
-        cac: safe(results.cac),
-        commission: safe(results.commissionPerSale),
-        totalCac: targetSales * safe(results.cac),
-        totalCommission: targetSales * safe(results.commissionPerSale),
-        cm1: targetSales * safe(results.marginPerSale),
-        cm2: targetSales * safe(results.marginPerSale) - fixedExp,
-        profit: hasNegativeMargin ? (targetSales * safe(results.marginPerSale) - fixedExp) : inputs.desiredMonthlyProfit,
+        cac,
+        commission,
+        totalCac: targetSales * cac,
+        totalCommission: targetSales * commission,
+        cm1: targetSales * marginPerSale,
+        cm2: targetSales * marginPerSale - fixedExp,
+        profit: targetSales * marginPerSale - fixedExp,
         hasNegativeMargin,
       }
 
@@ -313,65 +323,80 @@ export default function SimulatorPage() {
         callsPerDay: safe(Math.ceil(capacityCalls / 30)),
         callsPerMonth: capacityCalls,
         salesPerMonth: capacitySales,
-        revenue: safe(results.revenueAtCapacity),
-        cac: safe(results.cac),
-        commission: safe(results.commissionPerSale),
-        totalCac: capacitySales * safe(results.cac),
-        totalCommission: capacitySales * safe(results.commissionPerSale),
-        cm1: capacitySales * safe(results.marginPerSale),
-        cm2: capacitySales * safe(results.marginPerSale) - fixedExp,
-        profit: safe(results.profitAtCapacity),
+        revenue: capacitySales * avgSale,
+        cac,
+        commission,
+        totalCac: capacitySales * cac,
+        totalCommission: capacitySales * commission,
+        cm1: capacitySales * marginPerSale,
+        cm2: capacitySales * marginPerSale - fixedExp,
+        profit: capacitySales * marginPerSale - fixedExp,
         hasNegativeMargin,
       }
     } else if (isWebinarDirect) {
-      const targetSales = safe(Math.ceil(results.requiredSales))
-      const targetRegs = safe(Math.ceil(results.registrationsNeeded))
-      const targetAttendees = safe(Math.ceil(results.attendeesNeeded))
+      // For webinar direct with negative margin, show scenario at 100 registrations
+      const attendeeRate = (inputs.registrationToAttendeePct || 40) / 100
+      const saleRate = (inputs.attendeeToSalePct || 5) / 100
+      const regToSaleRate = attendeeRate * saleRate
+      const costPerReg = safe(results.costPerReg)
+      const netCostPerReg = safe(results.netCostPerReg)
 
-      // For webinar direct, capacity = target (no team limit)
+      // Sample scale: 100 registrations when margin is negative
+      const sampleRegs = 100
+      const sampleAttendees = Math.round(sampleRegs * attendeeRate)
+      const sampleSales = Math.round(sampleRegs * regToSaleRate)
+
+      // Use profit target if margin is positive, otherwise use sample scale
+      const targetRegs = hasNegativeMargin ? sampleRegs : safe(Math.ceil(results.registrationsNeeded))
+      const targetAttendees = hasNegativeMargin ? sampleAttendees : safe(Math.ceil(results.attendeesNeeded))
+      const targetSales = hasNegativeMargin ? sampleSales : safe(Math.ceil(results.requiredSales))
+
+      const monthlyAdSpend = targetRegs * netCostPerReg
+
       targetData = {
-        dailyAdSpend: safe(results.dailyAdSpend),
-        monthlyAdSpend: safe(results.netAdSpend),
+        dailyAdSpend: monthlyAdSpend / 30,
+        monthlyAdSpend: monthlyAdSpend,
         registrations: targetRegs,
         attendees: targetAttendees,
         salesPerMonth: targetSales,
         revenue: targetSales * avgSale,
-        cac: safe(results.cac),
-        commission: safe(results.commissionPerSale),
-        totalCac: targetSales * safe(results.cac),
-        totalCommission: targetSales * safe(results.commissionPerSale),
-        cm1: targetSales * safe(results.marginPerSale),
-        cm2: targetSales * safe(results.marginPerSale) - fixedExp,
-        profit: hasNegativeMargin ? (targetSales * safe(results.marginPerSale) - fixedExp) : inputs.desiredMonthlyProfit,
+        cac,
+        commission,
+        totalCac: targetSales * cac,
+        totalCommission: targetSales * commission,
+        cm1: targetSales * marginPerSale,
+        cm2: targetSales * marginPerSale - fixedExp,
+        profit: targetSales * marginPerSale - fixedExp,
         hasNegativeMargin,
       }
 
-      capacityData = { ...targetData, profit: targetData.cm2 }
+      capacityData = { ...targetData }
     } else if (isWebinarCall) {
-      const targetSales = safe(Math.ceil(results.requiredSales))
-      const targetRegs = safe(Math.ceil(results.registrationsNeeded))
-      const targetCalls = safe(Math.ceil(results.callsNeeded))
-      const capacitySales = safe(Math.floor(results.actualSalesAtCapacity))
+      // For webinar to call, use capacity as base when margin is negative
       const capacityCalls = safe(results.monthlyCallCapacity)
-
-      // Reverse calculate registrations for capacity
+      const capacitySales = safe(Math.floor(results.actualSalesAtCapacity))
       const regToCallRate = (results.regToAttendedCallRate || 1) / 100
       const capacityRegs = regToCallRate > 0 ? safe(Math.ceil(capacityCalls / regToCallRate)) : 0
 
+      // When margin is negative, show capacity scenario instead of impossible profit target
+      const targetSales = hasNegativeMargin ? capacitySales : safe(Math.ceil(results.requiredSales))
+      const targetCalls = hasNegativeMargin ? capacityCalls : safe(Math.ceil(results.callsNeeded))
+      const targetRegs = hasNegativeMargin ? capacityRegs : safe(Math.ceil(results.registrationsNeeded))
+
       targetData = {
-        dailyAdSpend: safe(results.dailyAdSpendForProfit),
-        monthlyAdSpend: safe(results.adSpendForProfit),
+        dailyAdSpend: hasNegativeMargin ? safe(results.dailyAdSpend) : safe(results.dailyAdSpendForProfit),
+        monthlyAdSpend: hasNegativeMargin ? safe(results.monthlyAdSpend) : safe(results.adSpendForProfit),
         registrations: targetRegs,
         callsPerMonth: targetCalls,
         salesPerMonth: targetSales,
         revenue: targetSales * avgSale,
-        cac: safe(results.cac),
-        commission: safe(results.commissionPerSale),
-        totalCac: targetSales * safe(results.cac),
-        totalCommission: targetSales * safe(results.commissionPerSale),
-        cm1: targetSales * safe(results.marginPerSale),
-        cm2: targetSales * safe(results.marginPerSale) - fixedExp,
-        profit: hasNegativeMargin ? (targetSales * safe(results.marginPerSale) - fixedExp) : inputs.desiredMonthlyProfit,
+        cac,
+        commission,
+        totalCac: targetSales * cac,
+        totalCommission: targetSales * commission,
+        cm1: targetSales * marginPerSale,
+        cm2: targetSales * marginPerSale - fixedExp,
+        profit: targetSales * marginPerSale - fixedExp,
         hasNegativeMargin,
       }
 
@@ -381,14 +406,14 @@ export default function SimulatorPage() {
         registrations: capacityRegs,
         callsPerMonth: capacityCalls,
         salesPerMonth: capacitySales,
-        revenue: safe(results.revenueAtCapacity),
-        cac: safe(results.cac),
-        commission: safe(results.commissionPerSale),
-        totalCac: capacitySales * safe(results.cac),
-        totalCommission: capacitySales * safe(results.commissionPerSale),
-        cm1: capacitySales * safe(results.marginPerSale),
-        cm2: capacitySales * safe(results.marginPerSale) - fixedExp,
-        profit: safe(results.profitAtCapacity),
+        revenue: capacitySales * avgSale,
+        cac,
+        commission,
+        totalCac: capacitySales * cac,
+        totalCommission: capacitySales * commission,
+        cm1: capacitySales * marginPerSale,
+        cm2: capacitySales * marginPerSale - fixedExp,
+        profit: capacitySales * marginPerSale - fixedExp,
         hasNegativeMargin,
       }
     }
@@ -737,18 +762,22 @@ export default function SimulatorPage() {
 
             {/* Two Section Grid */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Section 1: To Hit Profit Target */}
+              {/* Section 1: To Hit Profit Target (or sample scenario if unprofitable) */}
               <ResultsSection
-                title={`To Hit ₹${(inputs.desiredMonthlyProfit / 100000).toFixed(1)}L Profit`}
+                title={
+                  results.hasNegativeMargin
+                    ? (isWebinarDirect ? 'At 100 Registrations' : 'At Full Capacity')
+                    : `To Hit ₹${(inputs.desiredMonthlyProfit / 100000).toFixed(1)}L Profit`
+                }
                 icon={Target}
-                color="indigo"
+                color={results.hasNegativeMargin ? 'red' : 'indigo'}
                 data={displayData.targetData}
                 funnelType={funnelType}
                 inputs={inputs}
               />
 
-              {/* Section 2: At Full Capacity */}
-              {!isWebinarDirect && (
+              {/* Section 2: At Full Capacity (only show if not webinar direct AND margin is positive) */}
+              {!isWebinarDirect && !results.hasNegativeMargin && (
                 <ResultsSection
                   title="At Full Team Capacity"
                   icon={Maximize2}
