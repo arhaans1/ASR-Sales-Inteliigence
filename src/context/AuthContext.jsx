@@ -26,8 +26,12 @@ export function AuthProvider({ children }) {
       .eq('email', email.toLowerCase().trim())
       .single()
 
+    console.log('Login attempt for:', email.toLowerCase().trim())
+    console.log('Query result - profile:', profile)
+    console.log('Query result - error:', error)
+
     if (error || !profile) {
-      throw new Error('Invalid login credentials')
+      throw new Error('Invalid login credentials - user not found')
     }
 
     // Check password
@@ -35,9 +39,14 @@ export function AuthProvider({ children }) {
       throw new Error('Account not set up. Please contact admin.')
     }
 
+    const computedHash = await hashPassword(password)
+    console.log('Stored hash:', profile.password_hash)
+    console.log('Computed hash:', computedHash)
+    console.log('Hash length - stored:', profile.password_hash.length, 'computed:', computedHash.length)
+
     const isValid = await verifyPassword(password, profile.password_hash)
     if (!isValid) {
-      throw new Error('Invalid login credentials')
+      throw new Error('Invalid login credentials - password mismatch')
     }
 
     // Create session
