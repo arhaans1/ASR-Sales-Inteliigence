@@ -174,16 +174,26 @@ function ResultsSection({ title, icon: Icon, color, data, funnelType, inputs }) 
         {/* Margin Breakdown */}
         <div className="mb-2">
           <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Margin Breakdown</p>
-          <MetricRow
-            label="CM1 (Revenue − CAC − Commission)"
-            value={formatINR(data.cm1)}
-            highlight={data.cm1 > 0 ? 'green' : 'red'}
-          />
-          <MetricRow
-            label={`CM2 (CM1 − ₹${formatNumber(inputs.fixedMonthlyExpense)} Fixed)`}
-            value={formatINR(data.cm2)}
-            highlight={data.cm2 > 0 ? 'green' : 'red'}
-          />
+          <MetricRow label="Total Revenue" value={formatINR(data.revenue)} />
+          <MetricRow label="− Total CAC" value={formatINR(data.totalCac)} highlight="red" />
+          <MetricRow label="− Total Commission" value={formatINR(data.totalCommission)} highlight="red" />
+          <div className="border-t border-gray-200 mt-2 pt-2">
+            <MetricRow
+              label="= CM1 (Gross Margin)"
+              value={formatINR(data.cm1)}
+              highlight={data.cm1 > 0 ? 'green' : 'red'}
+              bold
+            />
+          </div>
+          <MetricRow label={`− Fixed Expenses`} value={formatINR(inputs.fixedMonthlyExpense)} highlight="red" />
+          <div className="border-t border-gray-200 mt-2 pt-2">
+            <MetricRow
+              label="= CM2 (Operating Margin)"
+              value={formatINR(data.cm2)}
+              highlight={data.cm2 > 0 ? 'green' : 'red'}
+              bold
+            />
+          </div>
         </div>
 
         {/* Final Profit/Loss */}
@@ -272,6 +282,8 @@ export default function SimulatorPage() {
         revenue: targetSales * avgSale,
         cac: results.cac,
         commission: results.commissionPerSale,
+        totalCac: targetSales * results.cac,
+        totalCommission: targetSales * results.commissionPerSale,
         cm1: targetSales * results.marginPerSale,
         cm2: targetSales * results.marginPerSale - fixedExp,
         profit: inputs.desiredMonthlyProfit,
@@ -286,6 +298,8 @@ export default function SimulatorPage() {
         revenue: results.revenueAtCapacity,
         cac: results.cac,
         commission: results.commissionPerSale,
+        totalCac: capacitySales * results.cac,
+        totalCommission: capacitySales * results.commissionPerSale,
         cm1: capacitySales * results.marginPerSale,
         cm2: capacitySales * results.marginPerSale - fixedExp,
         profit: results.profitAtCapacity,
@@ -305,6 +319,8 @@ export default function SimulatorPage() {
         revenue: targetSales * avgSale,
         cac: results.cac,
         commission: results.commissionPerSale,
+        totalCac: targetSales * results.cac,
+        totalCommission: targetSales * results.commissionPerSale,
         cm1: targetSales * results.marginPerSale,
         cm2: targetSales * results.marginPerSale - fixedExp,
         profit: inputs.desiredMonthlyProfit,
@@ -331,6 +347,8 @@ export default function SimulatorPage() {
         revenue: targetSales * avgSale,
         cac: results.cac,
         commission: results.commissionPerSale,
+        totalCac: targetSales * results.cac,
+        totalCommission: targetSales * results.commissionPerSale,
         cm1: targetSales * results.marginPerSale,
         cm2: targetSales * results.marginPerSale - fixedExp,
         profit: inputs.desiredMonthlyProfit,
@@ -345,6 +363,8 @@ export default function SimulatorPage() {
         revenue: results.revenueAtCapacity,
         cac: results.cac,
         commission: results.commissionPerSale,
+        totalCac: capacitySales * results.cac,
+        totalCommission: capacitySales * results.commissionPerSale,
         cm1: capacitySales * results.marginPerSale,
         cm2: capacitySales * results.marginPerSale - fixedExp,
         profit: results.profitAtCapacity,
