@@ -290,11 +290,28 @@ function UsersTab() {
     setMessage(null)
 
     try {
+      // Step 1: Create user in Supabase Auth
       const { data, error } = await supabase.auth.signUp({
         email: newEmail,
         password: newPassword,
       })
       if (error) throw error
+
+      // Step 2: Also create entry in user_profiles table so they appear in the list
+      if (data?.user?.id) {
+        const { error: profileError } = await supabase
+          .from('user_profiles')
+          .insert({
+            user_id: data.user.id,
+            email: newEmail,
+            is_superadmin: false,
+          })
+
+        if (profileError) {
+          console.error('Error creating user profile:', profileError)
+          // Don't throw - user was created in auth, profile insert may fail due to RLS or duplicates
+        }
+      }
 
       setMessage({ type: 'success', text: `User ${newEmail} created! They should check their email to confirm.` })
       setNewEmail('')

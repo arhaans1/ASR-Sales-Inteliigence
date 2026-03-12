@@ -87,34 +87,50 @@ export default function Layout({ children }) {
         }`}
       >
         {/* Logo - Clickable */}
-        <div className="flex items-center border-b border-gray-100">
-          <Link to="/" className="flex-1 p-4 hover:bg-gray-50 transition-colors">
-            <div className="flex items-center gap-2.5">
-              <img
-                src="/asr-logo.svg"
-                alt="ASR"
-                className="w-8 h-8 rounded-full flex-shrink-0"
-              />
-              {sidebarOpen && (
-                <div className="leading-tight">
-                  <p className="text-xs font-bold text-gray-900">Profit Simulator</p>
-                  <p className="text-[11px] text-gray-400">ASR Media Pro</p>
+        <div className="border-b border-gray-100">
+          {sidebarOpen ? (
+            <div className="flex items-center">
+              <Link to="/" className="flex-1 p-4 hover:bg-gray-50 transition-colors">
+                <div className="flex items-center gap-2.5">
+                  <img
+                    src="/asr-logo.svg"
+                    alt="ASR"
+                    className="w-8 h-8 rounded-full flex-shrink-0"
+                  />
+                  <div className="leading-tight">
+                    <p className="text-xs font-bold text-gray-900">Profit Simulator</p>
+                    <p className="text-[11px] text-gray-400">ASR Media Pro</p>
+                  </div>
                 </div>
-              )}
+              </Link>
+              {/* Toggle button when expanded */}
+              <button
+                onClick={() => setSidebarOpen(false)}
+                className="p-2 mr-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                title="Collapse sidebar"
+              >
+                <PanelLeftClose size={16} />
+              </button>
             </div>
-          </Link>
-          {/* Toggle inside header */}
-          <button
-            onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="p-2 mr-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
-            title={sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'}
-          >
-            {sidebarOpen ? (
-              <PanelLeftClose size={16} />
-            ) : (
-              <PanelLeft size={16} />
-            )}
-          </button>
+          ) : (
+            <div className="flex flex-col items-center py-3 gap-2">
+              <Link to="/" className="hover:bg-gray-50 rounded-lg p-1 transition-colors" title="Dashboard">
+                <img
+                  src="/asr-logo.svg"
+                  alt="ASR"
+                  className="w-8 h-8 rounded-full"
+                />
+              </Link>
+              {/* Toggle button when collapsed - always visible */}
+              <button
+                onClick={() => setSidebarOpen(true)}
+                className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                title="Expand sidebar"
+              >
+                <PanelLeft size={16} />
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Superadmin: Admin Selector */}
@@ -237,24 +253,21 @@ export default function Layout({ children }) {
 
         {/* User footer */}
         <div className="p-3 border-t border-gray-100">
-          <div className={`flex items-center gap-2 ${sidebarOpen ? 'px-2' : 'justify-center'}`}>
-            <Link
-              to="/account"
-              className={`flex items-center gap-2 ${sidebarOpen ? 'flex-1 min-w-0' : ''} hover:bg-gray-50 rounded-lg p-1 -m-1 transition-colors`}
-              title={!sidebarOpen ? user?.email : undefined}
-            >
-              <div className="w-7 h-7 bg-indigo-100 rounded-full flex items-center justify-center flex-shrink-0">
-                <span className="text-xs font-semibold text-indigo-600">
-                  {(user?.email?.[0] ?? '?').toUpperCase()}
-                </span>
-              </div>
-              {sidebarOpen && (
+          {sidebarOpen ? (
+            <div className="flex items-center gap-2 px-2">
+              <Link
+                to="/account"
+                className="flex items-center gap-2 flex-1 min-w-0 hover:bg-gray-50 rounded-lg p-1 -m-1 transition-colors"
+              >
+                <div className="w-7 h-7 bg-indigo-100 rounded-full flex items-center justify-center flex-shrink-0">
+                  <span className="text-xs font-semibold text-indigo-600">
+                    {(user?.email?.[0] ?? '?').toUpperCase()}
+                  </span>
+                </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-xs font-medium text-gray-800 truncate">{user?.email}</p>
                 </div>
-              )}
-            </Link>
-            {sidebarOpen && (
+              </Link>
               <button
                 onClick={handleSignOut}
                 className="p-1.5 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
@@ -262,8 +275,29 @@ export default function Layout({ children }) {
               >
                 <LogOut size={14} />
               </button>
-            )}
-          </div>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center gap-2">
+              <Link
+                to="/account"
+                className="hover:bg-gray-50 rounded-lg p-1 transition-colors"
+                title={user?.email}
+              >
+                <div className="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center">
+                  <span className="text-xs font-semibold text-indigo-600">
+                    {(user?.email?.[0] ?? '?').toUpperCase()}
+                  </span>
+                </div>
+              </Link>
+              <button
+                onClick={handleSignOut}
+                className="p-2 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                title="Sign out"
+              >
+                <LogOut size={16} />
+              </button>
+            </div>
+          )}
         </div>
       </aside>
 
